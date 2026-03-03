@@ -45,6 +45,8 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+  --font-poppins: var(--font-poppins);
+  --font-helvetica: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 :root {
@@ -114,6 +116,14 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+.font-poppins {
+  font-family: var(--font-poppins);
+}
+
+.font-helvetica {
+  font-family: var(--font-helvetica);
 }
 
 @layer base {
