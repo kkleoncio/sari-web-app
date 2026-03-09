@@ -13,6 +13,7 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.35.1",
     "lucide-react": "^0.575.0",
     "mongodb": "^7.1.0",
     "mongoose": "^9.2.3",

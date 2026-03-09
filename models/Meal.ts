@@ -6,7 +6,11 @@ const MealSchema = new mongoose.Schema({
   tags: [String],
   type: String,
   category: String,
-  establishmentId: { type: String, required: true }, // could also use ObjectId
+  establishmentId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Establishment",
+  required: true,
+},
 });
 
 export default mongoose.models.Meal || mongoose.model("Meal", MealSchema);

@@ -16,25 +16,42 @@ export default function LoginPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+  e.preventDefault();
+  setError("");
 
+  try {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
 
-    const data = await res.json();
+    const text = await res.text(); // read raw response first
+    let data: any = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { message: text }; // if server returned plain text/html
+    }
+
+    console.log("LOGIN RESPONSE:", {
+      status: res.status,
+      ok: res.ok,
+      data,
+    });
 
     if (!res.ok) {
-      setError(data.message || "Login failed");
+      setError(data.message || `Login failed (${res.status})`);
       return;
     }
 
     localStorage.setItem("userId", data.userId);
     router.push("/home");
-  };
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+    setError("Network error. Check server is running.");
+  }
+};
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-slate-100 via-emerald-50 to-emerald-100">
