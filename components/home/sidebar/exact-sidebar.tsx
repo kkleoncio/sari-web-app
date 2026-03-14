@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Store,
@@ -74,6 +75,7 @@ type ExactSidebarProps = {
 };
 
 export function ExactSidebar({ active, onChange }: ExactSidebarProps) {
+  const router = useRouter();
   return (
     <aside
       className="flex h-screen w-[250px] flex-col overflow-visible pl-5 text-white"
@@ -128,9 +130,14 @@ export function ExactSidebar({ active, onChange }: ExactSidebarProps) {
       </nav>
 
       <div className="pb-8 pl-10">
-        <button type="button" className="flex items-center text-white/95">
-          <LogOut className="h-[18px] w-[18px]" />
-          <span className="ml-4 text-[16px] font-medium">Logout</span>
+        <button
+          onClick={() => {
+            localStorage.removeItem("userId");
+            localStorage.removeItem("isLoggedIn");
+            router.push("/auth/login");
+          }}
+        >
+          Log out
         </button>
       </div>
     </aside>

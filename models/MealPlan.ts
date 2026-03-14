@@ -1,78 +1,50 @@
-import mongoose from "mongoose";
+import mongoose, { Schema, model, models } from "mongoose";
 
-// Subdocument schema for each meal in a plan
-const MealSchema = new mongoose.Schema(
+const SavedMealSchema = new Schema(
   {
+    _id: { type: String },
     mealName: { type: String, required: true },
     price: { type: Number, required: true },
-    establishment: { type: String, required: true },
+    establishmentName: { type: String, required: true },
+    establishmentCategory: { type: String, default: "" },
+    location: { type: String, default: "" },
+    foodType: { type: String, default: "" },
+    category: { type: String, default: "" },
+    mealTime: { type: [String], default: [] },
+    healthScore: { type: Number, default: 5 },
+    isFried: { type: Boolean, default: false },
+    isSoup: { type: Boolean, default: false },
+    isVegetarian: { type: Boolean, default: false },
+    tags: { type: [String], default: [] },
+    allergens: { type: [String], default: [] },
   },
   { _id: false }
 );
 
-// Main MealPlan schema
-const MealPlanSchema = new mongoose.Schema(
+const MealPlanSchema = new Schema(
   {
-    // link to logged-in user
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-
-    // NEW: store the original budget
-    budget: {
-      type: Number,
-      required: true,
-    },
-
+    userId: { type: String, required: true },
     allowanceType: {
       type: String,
       enum: ["daily", "weekly"],
-      required: true,
+      default: "daily",
     },
-
-    // NEW: number of meals per day (from modal)
-    mealsPerDay: {
-      type: Number,
-      default: 3,
-    },
-
-    // NEW: number of days (1 for daily, 7 for weekly)
-    days: {
-      type: Number,
-      default: 1,
-    },
-
-    totalCost: {
-      type: Number,
-      required: true,
-    },
-
-    remainingBudget: {
-      type: Number,
-      required: true,
-    },
-
-    meals: {
-      type: [MealSchema],
-      required: true,
-    },
-
-    // NEW: mark current vs old plans
-    status: {
-      type: String,
-      enum: ["active", "archived"],
-      default: "active",
-    },
-
-    dateGenerated: {
-      type: Date,
-      default: Date.now,
-    },
+    budget: { type: Number, required: true },
+    mealsPerDay: { type: Number, default: 3 },
+    totalCost: { type: Number, required: true },
+    remainingBudget: { type: Number, required: true },
+    score: { type: Number, default: 0 },
+    label: { type: String, default: "" },
+    selected: { type: Boolean, default: true },
+    meals: { type: [SavedMealSchema], default: [] },
   },
   { timestamps: true }
 );
 
-export default mongoose.models.MealPlan ||
-  mongoose.model("MealPlan", MealPlanSchema);
+
+MealPlanSchema.index({ userId: 1, createdAt: -1 });
+MealPlanSchema.index({ userId: 1, selected: 1, createdAt: -1 });
+
+const MealPlan = models.MealPlan || model("MealPlan", MealPlanSchema);
+
+export default MealPlan;

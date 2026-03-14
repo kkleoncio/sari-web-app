@@ -7,19 +7,27 @@ export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
 
-    const { firstName, lastName, email, password, budget, allowanceType } = await req.json();
+    const body = await req.json();
+    const firstName = body.firstName?.trim();
+    const lastName = body.lastName?.trim();
+    const email = body.email?.trim().toLowerCase();
+    const password = body.password;
 
     if (!email || !password || !firstName || !lastName) {
-      return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
+      return NextResponse.json(
+        { message: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
-    // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return NextResponse.json({ message: "Email already exists" }, { status: 400 });
+      return NextResponse.json(
+        { message: "Email already exists" },
+        { status: 400 }
+      );
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
@@ -27,12 +35,21 @@ export async function POST(req: NextRequest) {
       lastName,
       email,
       password: hashedPassword,
-      budget,
-      allowanceType
     });
 
-    return NextResponse.json({ message: "User created successfully", userId: user._id });
+    return NextResponse.json(
+      {
+        message: "User created successfully",
+        userId: user._id,
+      },
+      { status: 201 }
+    );
   } catch (error) {
-    return NextResponse.json({ message: "Sign up failed", error }, { status: 500 });
+    console.error("POST /api/auth/signup error:", error);
+
+    return NextResponse.json(
+      { message: "Sign up failed. Please try again." },
+      { status: 500 }
+    );
   }
 }

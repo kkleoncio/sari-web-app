@@ -1,132 +1,152 @@
+import { NextRequest, NextResponse } from "next/server";
 import connectToDatabase from "@/lib/db";
-import Meal from "@/models/Meal";
+import MealModel from "@/models/Meal";
+import { generateMealPlans } from "@/lib/meal-generator";
 
-type AllowanceType = "daily" | "weekly";
-
-function shuffle<T>(arr: T[]) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const {
-      budget,
-      allowanceType = "daily",
-      mealsPerDay = 3,
-      count = 6,
-    }: {
-      budget: number;
-      allowanceType?: AllowanceType;
-      mealsPerDay?: number;
-      count?: number;
-    } = await req.json();
-
-    if (!budget || budget <= 0) {
-      return new Response(JSON.stringify({ message: "Valid budget is required" }), { status: 400 });
-    }
-
     await connectToDatabase();
 
-    // ✅ One query: include establishment name
-    const meals = await Meal.find()
-      .populate("establishmentId", "name")
-      .lean();
+    const body = await req.json();
 
-    if (!meals.length) {
-      return new Response(JSON.stringify({ message: "No meals found" }), { status: 404 });
+    const budget = Number(body.budget);
+    const mealsPerDay = Number(body.mealsPerDay);
+    const count = Number(body.count ?? 6);
+
+    const foodType = body.foodType;
+    const category = body.category;
+    const excludeAllergens = Array.isArray(body.excludeAllergens)
+      ? body.excludeAllergens
+      : [];
+    const vegetarianOnly = Boolean(body.vegetarianOnly);
+    const preferenceMode = body.preferenceMode ?? "balanced";
+    const mealType = body.mealType ?? "full-meals";
+
+    if (Number.isNaN(budget) || budget <= 0) {
+      return NextResponse.json(
+        { ok: false, message: "Valid budget is required." },
+        { status: 400 }
+      );
     }
 
-    const days = allowanceType === "weekly" ? 7 : 1;
-    const targetMeals = Math.max(1, Math.min(50, Number(mealsPerDay) * days));
-    const desired = Math.min(Math.max(1, Number(count) || 6), 12);
+    if (Number.isNaN(mealsPerDay) || mealsPerDay <= 0) {
+      return NextResponse.json(
+        { ok: false, message: "Valid mealsPerDay is required." },
+        { status: 400 }
+      );
+    }
 
-    const buildPlan = (candidates: any[]) => {
-      let remainingBudget = budget;
-      const selected: Array<{ mealName: string; price: number; establishment: string }> = [];
+    if (Number.isNaN(count) || count <= 0) {
+      return NextResponse.json(
+        { ok: false, message: "Valid count is required." },
+        { status: 400 }
+      );
+    }
 
-      for (const meal of candidates) {
-        if (selected.length >= targetMeals) break;
-
-        const price = Number(meal.price ?? 0);
-        if (price <= 0) continue;
-
-        if (price <= remainingBudget) {
-          const estName =
-            (meal.establishmentId && (meal.establishmentId as any).name) ||
-            "Unknown Establishment";
-
-          selected.push({
-            mealName: meal.mealName || "Unknown Meal",
-            price,
-            establishment: estName,
-          });
-
-          remainingBudget -= price;
-        }
-      }
-
-      const totalCost = budget - remainingBudget;
-
-      return {
-        meals: selected,
-        totalCost,
-        remainingBudget,
-      };
+    const query: Record<string, unknown> = {
+      isAvailable: true,
     };
 
-    const options: Array<{
-      meals: Array<{ mealName: string; price: number; establishment: string }>;
-      totalCost: number;
-      remainingBudget: number;
-    }> = [];
-
-    const seen = new Set<string>();
-    const MAX_ATTEMPTS = desired * 30;
-
-    let attempts = 0;
-    while (options.length < desired && attempts < MAX_ATTEMPTS) {
-      attempts++;
-
-      // Randomize
-      const shuffled = shuffle(meals);
-
-      // Variety trick: half the time, bias to cheaper-first; half pure random
-      const candidates =
-        Math.random() < 0.5
-          ? shuffled
-          : [...shuffled].sort((a, b) => Number(a.price) - Number(b.price));
-
-      const plan = buildPlan(candidates);
-
-      // skip empty plans
-      if (!plan.meals.length) continue;
-
-      // dedupe by signature
-      const signature = plan.meals
-        .map((m) => `${m.establishment}|${m.mealName}|${m.price}`)
-        .sort()
-        .join("||");
-
-      if (seen.has(signature)) continue;
-      seen.add(signature);
-
-      options.push(plan);
+    if (foodType) {
+      query.foodType = foodType;
     }
 
-    return new Response(
-      JSON.stringify({
-        options,
-        meta: { budget, allowanceType, mealsPerDay, targetMeals, generated: options.length },
-      }),
-      { status: 200 }
+    if (category) {
+      query.category = category;
+    }
+
+    if (vegetarianOnly) {
+      query.isVegetarian = true;
+    }
+
+    let meals = await MealModel.find(query).lean();
+
+    if (excludeAllergens.length > 0) {
+      meals = meals.filter((meal) => {
+        const mealAllergens = meal.allergens ?? [];
+        return !excludeAllergens.some((allergen: string) =>
+          mealAllergens.includes(allergen)
+        );
+      });
+    }
+
+    if (mealType === "full-meals") {
+      meals = meals.filter((meal) => {
+        const category = meal.category?.toLowerCase() ?? "";
+        const foodType = meal.foodType?.toLowerCase() ?? "";
+        const tags = (meal.tags ?? []).map((tag: string) => tag.toLowerCase());
+
+        return (
+          category.includes("meal") ||
+          category.includes("rice") ||
+          foodType.includes("meal") ||
+          tags.includes("heavy") ||
+          tags.includes("rice meal")
+        );
+      });
+    }
+
+    if (mealType === "snacks") {
+      meals = meals.filter((meal) => {
+        const category = meal.category?.toLowerCase() ?? "";
+        const foodType = meal.foodType?.toLowerCase() ?? "";
+        const tags = (meal.tags ?? []).map((tag: string) => tag.toLowerCase());
+
+        return (
+          category.includes("snack") ||
+          foodType.includes("snack") ||
+          tags.includes("light") ||
+          tags.includes("merienda")
+        );
+      });
+    }
+
+    const normalizedMeals = meals.map((meal) => ({
+      ...meal,
+      _id: String(meal._id),
+    }));
+
+    if (normalizedMeals.length < mealsPerDay) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Not enough meals available to generate a plan.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const options = generateMealPlans({
+      meals: normalizedMeals,
+      budget,
+      mealsPerDay,
+      count,
+      preferenceMode,
+    });
+
+    if (!options.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: `No meal plan fits PHP ${budget} right now. Try increasing your budget or reducing meals per day.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      options,
+    });
+  } catch (error) {
+    console.error("POST /api/mealplans/generate error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Failed to generate meal plans.",
+      },
+      { status: 500 }
     );
-  } catch (err) {
-    console.error(err);
-    return new Response(JSON.stringify({ message: "Failed to generate options" }), { status: 500 });
   }
 }

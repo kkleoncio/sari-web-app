@@ -1,39 +1,27 @@
+import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/db";
 import Establishment from "@/models/Establishment";
-import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await connectToDatabase();
 
-    const establishments = await Establishment.find();
+    const establishments = await Establishment.find({}).sort({ name: 1 });
 
-    return NextResponse.json(establishments);
-  } catch (error) {
-    return NextResponse.json({ message: "Failed to fetch establishments", error }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    await connectToDatabase();
-
-    const body = await req.json();
-    const { name, location, contactInfo, openingHours } = body;
-
-    if (!name) {
-      return NextResponse.json({ message: "Name is required" }, { status: 400 });
-    }
-
-    const establishment = await Establishment.create({
-      name,
-      location,
-      contactInfo,
-      openingHours // new field
+    return NextResponse.json({
+      ok: true,
+      count: establishments.length,
+      establishments,
     });
-
-    return NextResponse.json(establishment);
   } catch (error) {
-    return NextResponse.json({ message: "Failed to create establishment", error }, { status: 500 });
+    console.error("GET /api/establishments error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Failed to fetch establishments",
+      },
+      { status: 500 }
+    );
   }
 }

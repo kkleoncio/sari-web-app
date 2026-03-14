@@ -16,6 +16,7 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<"signin" | "signup">("signup");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -23,25 +24,41 @@ export default function SignupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsSubmitting(true);
 
-    // Adjust endpoint to your actual signup API route
-    const res = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
 
-    const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
 
-    if (!res.ok) {
-      setError(data.message || "Sign up failed");
-      return;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { message: text };
+      }
+
+      if (!res.ok) {
+        setError(data.message || "Sign up failed");
+        return;
+      }
+
+      if (data.userId) {
+        localStorage.setItem("userId", data.userId);
+        localStorage.setItem("isLoggedIn", "true");
+      }
+
+      router.push("/home");
+    } catch (error) {
+      console.error("SIGNUP ERROR:", error);
+      setError("Network error. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // If your API returns userId, keep this; otherwise remove
-    if (data.userId) localStorage.setItem("userId", data.userId);
-
-    router.push("/home");
   };
 
   return (
@@ -62,7 +79,7 @@ export default function SignupPage() {
               <div className="pointer-events-none absolute right-0 top-0 hidden h-full w-px bg-white/25 lg:block" />
 
               <div className="w-full max-w-sm">
-                <h1 className="text-center text-3xl font-bold font-poppins text-[#0d3626]">
+                <h1 className="text-center text-3xl font-bold font-poppins text-[#023030]">
                   Sign Up
                 </h1>
 
@@ -110,7 +127,7 @@ export default function SignupPage() {
                   {/* First + Last Name (two columns) */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="mb-2 block text-[12px] text-[#0d3626] font-helvetica font-normal">
+                      <label className="mb-2 block text-[12px] text-[#023030] font-helvetica font-normal">
                         First Name *
                       </label>
                       <div className="relative">
@@ -122,13 +139,13 @@ export default function SignupPage() {
                           value={form.firstName}
                           onChange={handleChange}
                           required
-                          className="w-full rounded-xl font-helvetica font-light border border-gray-300/40 bg-white/30 py-2.5 pl-10 pr-4 text-[13px] text-gray-900 placeholder-gray-500/60 outline-none transition focus:border-[#0d3626]/40 focus:ring-2 focus:ring-[#0d3626]/25"
+                          className="w-full rounded-xl font-helvetica font-light border border-gray-300/40 bg-white/30 py-2.5 pl-10 pr-4 text-[12px] text-gray-900 placeholder-gray-500/60 outline-none transition focus:border-[#0d3626]/40 focus:ring-2 focus:ring-[#0d3626]/25"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[12px] text-[#0d3626] font-helvetica font-normal">
+                      <label className="mb-2 block text-[12px] text-[#023030] font-helvetica font-normal">
                         Last Name *
                       </label>
                       <div className="relative">
@@ -140,7 +157,7 @@ export default function SignupPage() {
                           value={form.lastName}
                           onChange={handleChange}
                           required
-                          className="w-full rounded-xl font-helvetica font-light border border-gray-300/40 bg-white/30 py-2.5 pl-10 pr-4 text-[13px] text-gray-900 placeholder-gray-500/60 outline-none transition focus:border-[#0d3626]/40 focus:ring-2 focus:ring-[#0d3626]/25"
+                          className="w-full rounded-xl font-helvetica font-light border border-gray-300/40 bg-white/30 py-2.5 pl-10 pr-4 text-[12px] text-gray-900 placeholder-gray-500/60 outline-none transition focus:border-[#0d3626]/40 focus:ring-2 focus:ring-[#0d3626]/25"
                         />
                       </div>
                     </div>
@@ -148,7 +165,7 @@ export default function SignupPage() {
 
                   {/* Email */}
                   <div>
-                    <label className="mb-2 block text-[12px] text-[#0d3626] font-helvetica font-normal">
+                    <label className="mb-2 block text-[12px] text-[#023030] font-helvetica font-normal">
                       Email Address *
                     </label>
                     <div className="relative">
@@ -167,7 +184,7 @@ export default function SignupPage() {
 
                   {/* Password */}
                   <div>
-                    <label className="mb-2 block text-[12px] text-[#0d3626] font-helvetica font-normal">
+                    <label className="mb-2 block text-[12px] text-[#023030] font-helvetica font-normal">
                       Password *
                     </label>
                     <div className="relative">
@@ -199,14 +216,16 @@ export default function SignupPage() {
                   {/* Sign up */}
                   <button
                     type="submit"
-                    className="font-helvetica mt-2 w-full rounded-xl bg-[#0d3626] py-2.5 text-[13px] text-white shadow-lg transition hover:bg-[#0d3626]/90"
+                    disabled={isSubmitting}
+                    className="font-helvetica mt-2 w-full rounded-xl bg-[linear-gradient(135deg,#0a8f8f_0%,#046d6d_45%,#033f3f_90%,#022b2b_100%)] py-2.5 text-[13px] font-light text-white shadow-[0_8px_18px_rgba(2,48,48,0.25)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(2,48,48,0.35)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Sign Up
+                    {isSubmitting ? "Creating account..." : "Sign Up"}
                   </button>
 
                   {/* Google */}
                   <button
                     type="button"
+                    disabled
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-300/40 bg-white/25 py-2.5 text-[13px] font-helvetica text-[#2c3531] transition hover:bg-white/35"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -233,69 +252,85 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {/* RIGHT PANEL (same as signin) */}
-            <div className="relative hidden lg:block h-full overflow-hidden rounded-r-3xl">
-              <Image
-                src="/right-signin-bg.png"
-                alt="SARI welcome card"
-                fill
-                className="object-cover"
-                priority
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
-
-              <div className="absolute left-3 top-7 z-20 h-48 w-48">
-                <Image
-                  src="/sari-logo-yellow.png"
-                  alt="SARI logo"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
-
-               {/* Text */}
-                <div className="absolute left-10 bottom-63 z-20 max-w-[420px] text-white">
-                  <h2 className="text-3xl font-semibold font-poppins leading-tight drop-shadow">
-                    Welcome to SARI
-                  </h2>
-
-                  <p className="mt-3 text-xs leading-snug text-white/90 drop-shadow font-helvetica font-extralight">
-                    Not sure what to eat today? Enter your budget and get a full <br />
-                    day&apos;s worth of meals planned in seconds.
-                  </p>
-
-                  <p className="mt-4 text-xs text-white/90 drop-shadow font-helvetica font-extralight">
-                    Sign up for free and let sari handle the rest
-                  </p>
-                </div>
-
-              <div className="absolute left-5 bottom-8 z-20 w-[420px]">
-                <Image
-                  src="/card.png"
-                  alt="Budget card"
-                  width={840}
-                  height={420}
-                  className="h-auto w-full"
-                  priority
-                />
-
-                <div className="absolute bottom-8 right-10 flex items-center">
-                  <img
-                    src="/avatar1.jpg"
-                    className="h-8 w-8 rounded-full border-2 border-white object-cover"
-                  />
-                  <img
-                    src="/avatar2.jpg"
-                    className="-ml-3 h-8 w-8 rounded-full border-2 border-white object-cover"
-                  />
-                  <img
-                    src="/avatar3.jpg"
-                    className="-ml-3 h-8 w-8 rounded-full border-2 border-white object-cover"
-                  />
-                </div>
-              </div>
-            </div>
+            {/* RIGHT PANEL */}
+                  <div className="relative hidden lg:block h-full overflow-hidden rounded-r-3xl">
+                    {/* Background */}
+                    <Image
+                      src="/right-signin.png"
+                      alt="SARI welcome card"
+                      fill
+                      className="object-cover"
+                      priority
+                    />
+            
+                  {/* Optional overlay for readability (keep subtle since your design is already readable) */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
+            
+                  {/* Logo */}
+                  <div className="absolute left-3 top-7 z-20 h-48 w-48  ">
+                    <Image
+                      src="/sari-logo-yellow.png"
+                      alt="SARI logo"
+                      fill
+                      className="object-contain"
+                      priority
+                    />
+                  </div>
+            
+                  {/* Text */}
+                  <div className="absolute left-12 bottom-63 z-20 max-w-[420px] text-white">
+                    <h2 className="text-3xl font-semibold font-poppins leading-tight drop-shadow">
+                      Welcome to SARI
+                    </h2>
+            
+                    <p className="mt-3 text-xs leading-snug text-white/90 drop-shadow font-helvetica font-extralight">
+                      Not sure what to eat today? Enter your budget and get a full <br />
+                      day&apos;s worth of meals planned in seconds.
+                    </p>
+            
+                    <p className="mt-4 text-xs text-white/90 drop-shadow font-helvetica font-extralight">
+                      Sign up for free and let sari handle the rest
+                    </p>
+                  </div>
+            
+                  {/* CARD */}
+                  <div className="absolute left-12 bottom-12 z-20 w-[370px]">
+                    <Image
+                      src="/Subtract.png"
+                      alt="Budget card"
+                      width={740}
+                      height={320}
+                      className="h-auto w-full"
+                      priority
+                    />
+            
+                    <p className="mt-3 text-md leading-snug text-[#023030] drop-shadow font-poppins font-semibold absolute left-8 top-5">
+                      Your daily budget can go  <br />
+                      further than you think
+                    </p>
+            
+                    <p className="mt-3 text-xs leading-snug text-[#023030] drop-shadow font-helvetica font-light absolute left-8 top-20">
+                      Be one of the first iskolars to eat  <br />
+                      smarter with sari
+                    </p>
+            
+                    {/* Avatars */}
+                    <div className="absolute bottom-8 right-10 flex items-center">
+                      <img
+                        src="/avatar1.jpg"
+                        className="h-8 w-8 rounded-full border-2 border-white object-cover"
+                      />
+                      <img
+                        src="/avatar2.jpg"
+                        className="-ml-3 h-8 w-8 rounded-full border-2 border-white object-cover"
+                      />
+                      <img
+                        src="/avatar3.jpg"
+                        className="-ml-3 h-8 w-8 rounded-full border-2 border-white object-cover"
+                      />
+                    </div>
+                    </div>
+                    </div>
             {/* END RIGHT */}
           </div>
         </div>

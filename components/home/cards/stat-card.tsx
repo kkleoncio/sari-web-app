@@ -1,13 +1,22 @@
-type StatCardProps = {
+type StatCardGlassProps = {
   label: string;
   value: string;
 };
 
-export function StatCard({ label, value }: StatCardProps) {
+export function StatCardGlass({ label, value }: StatCardGlassProps) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[linear-gradient(135deg,#022b2b_0%,#033f3f_45%,#046d6d_90%,#0a8f8f_100%)] px-4 py-7 text-white shadow-[0_10px_24px_rgba(2,48,48,0.18)]">
-      <p className="font-helvetica text-sm font-light text-white">{label}</p>
-      <p className="mt-0 text-[18px] font-semibold sm:text-[35px]">{value}</p>
+    <div className="relative overflow-hidden rounded-2xl border border-white/40 bg-white/14 p-4 backdrop-blur-xl shadow-[0_8px_20px_rgba(2,48,48,0.08)]">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.34),rgba(255,255,255,0.10)_45%,transparent_75%)]" />
+      <div className="pointer-events-none absolute inset-[1px] rounded-2xl border border-white/20" />
+
+      <div className="relative z-10">
+        <p className="font-helvetica text-xs font-light text-[#023030]/60">
+          {label}
+        </p>
+        <p className="font-poppins mt-1 text-lg font-semibold text-[#023030]">
+          {value}
+        </p>
+      </div>
     </div>
   );
 }

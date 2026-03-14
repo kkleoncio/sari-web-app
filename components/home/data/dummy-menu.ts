@@ -1,4 +1,6 @@
-export const dummyMenu = [
+import type { MenuItem } from "@/app/home/types";
+
+export const dummyMenu: MenuItem[] = [
   {
     id: "1",
     mealName: "Chicken Adobo",
@@ -16,7 +18,7 @@ export const dummyMenu = [
     price: 110,
     rating: 4.7,
     tags: ["Popular", "Sizzling"],
-   imageUrl:
+    imageUrl:
       "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1200&auto=format&fit=crop",
   },
   {

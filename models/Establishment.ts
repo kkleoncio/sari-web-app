@@ -1,18 +1,47 @@
-import mongoose from "mongoose";
+import mongoose, { Schema, model, models } from "mongoose";
 
-const EstablishmentSchema = new mongoose.Schema(
+const EstablishmentSchema = new Schema(
   {
     name: {
       type: String,
-      required: true
+      required: true,
+      trim: true,
     },
-
-    location: String,          // renamed from location
-    contactInfo: String,          // renamed from contactInfo
-    openingHours: String      // format: "07:00-20:00"
+    category: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    location: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    priceRange: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    openingHours: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    isOpen: {
+      type: Boolean,
+      default: true,
+    },
+    tags: {
+      type: [String],
+      default: [],
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-export default mongoose.models.Establishment ||
-  mongoose.model("Establishment", EstablishmentSchema);
+const Establishment =
+  models.Establishment || model("Establishment", EstablishmentSchema);
+
+export default Establishment;
