@@ -103,6 +103,7 @@ export async function POST(req: Request) {
       score: Number(selectedOption.score ?? 0),
       label: selectedOption.label ?? "",
       selected: true,
+      isCustomized: false,
       meals: normalizedMeals,
     });
 

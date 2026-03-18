@@ -44,8 +44,14 @@ export default function LoginPage() {
 
       localStorage.setItem("userId", data.userId);
       localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("firstName", data.firstName || "");
+      localStorage.setItem("role", data.role || "user");
 
-      router.push("/home");
+      if (data.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/home");
+      }
     } catch (err) {
       console.error("LOGIN ERROR:", err);
       setError("Network error. Check server is running.");

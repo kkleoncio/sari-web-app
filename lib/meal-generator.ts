@@ -26,8 +26,10 @@ type GenerateMealPlansParams = {
   mealsPerDay: number;
   count?: number;
   preferenceMode?: PreferenceMode;
+  preferredTags?: string[];
+  dislikedTags?: string[];
+  categoryLimit?: number;
 };
-
 const DEFAULT_COUNT = 6;
 
 /**

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, Clock3, Plus } from "lucide-react";
+import { ArrowLeft, MapPin, Clock3, Plus, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ReplaceGeneratedPlanModal } from "@/components/home/modals/replace-generated-plan-modal";
@@ -115,7 +115,10 @@ const [pendingMeal, setPendingMeal] = React.useState<Meal | null>(null);
   const updatedPlan = [...existingPlan, meal];
   localStorage.setItem("manualMealPlan", JSON.stringify(updatedPlan));
   localStorage.setItem("currentPlanSource", "manual");
-  toast.success(`${meal.mealName} added to your plan`);
+  toast.success(`${meal.mealName} added to your plan`, {
+    icon: <CheckCircle2 className="text-[#046d6d]" />,
+  } 
+  );
 };
 
   const handleAddToPlan = (meal: Meal) => {
@@ -124,10 +127,6 @@ const [pendingMeal, setPendingMeal] = React.useState<Meal | null>(null);
     );
 
     const hasManualPlan = manualPlan.length > 0;
-    const hasGeneratedPlan = !hasManualPlan && Number(localStorage.getItem("currentBudget") || "0") > 0;
-
-    // Better check: if there is no manual plan but the user came from a generated flow,
-    // rely on a flag in localStorage.
     const currentPlanSource = localStorage.getItem("currentPlanSource");
 
     if (currentPlanSource === "generated") {

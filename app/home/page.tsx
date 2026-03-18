@@ -14,7 +14,9 @@ import {
   ChevronRight,
   RotateCcw,
   Users,
-  Trash2
+  Trash2,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 
 import type {
@@ -163,8 +165,13 @@ const [mealType, setMealType] =
       clearTimeout(autoScrollTimeoutRef.current);
     }
 
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+
+    const top = targetRect.top - containerRect.top + container.scrollTop - 24;
+
     container.scrollTo({
-      top: target.offsetTop - 24,
+      top,
       behavior: "smooth",
     });
 
@@ -191,34 +198,43 @@ const [mealType, setMealType] =
     const handleScroll = () => {
       if (isAutoScrollingRef.current) return;
 
-      const scrollTop = container.scrollTop;
-      const offset = 120;
+      const containerRect = container.getBoundingClientRect();
 
-      let current: NavKey = "dashboard";
+      let bestKey: NavKey = "dashboard";
+      let bestVisibleHeight = 0;
 
       for (const section of sectionMap) {
         const el = section.ref.current;
         if (!el) continue;
 
-        if (scrollTop >= el.offsetTop - offset) {
-          current = section.key;
+        const rect = el.getBoundingClientRect();
+
+        const visibleTop = Math.max(rect.top, containerRect.top);
+        const visibleBottom = Math.min(rect.bottom, containerRect.bottom);
+        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+
+        if (visibleHeight > bestVisibleHeight) {
+          bestVisibleHeight = visibleHeight;
+          bestKey = section.key;
         }
       }
 
-      setActiveNav((prev) => (prev === current ? prev : current));
+      setActiveNav((prev) => (prev === bestKey ? prev : bestKey));
     };
 
     handleScroll();
     container.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
 
     return () => {
       container.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
 
       if (autoScrollTimeoutRef.current) {
         clearTimeout(autoScrollTimeoutRef.current);
       }
     };
-  }, [sectionMap, options.length, mealPlan.length]);
+  }, [sectionMap]);
 
   React.useEffect(() => {
     if (!authChecked) return;
@@ -386,7 +402,7 @@ const [mealType, setMealType] =
 
     const toastId = toast.loading("Generating meal plans...");
 
-    try {
+    try { 
       const userId = localStorage.getItem("userId");
       if (!userId) {
         toast.error("Please login first", { id: toastId });
@@ -421,16 +437,16 @@ const [mealType, setMealType] =
       setOptions(opts);
       setShowAllOptions(false);
 
-      const first = opts[0];
-      setMealPlan(first?.meals || []);
-      setTotalCost(first?.totalCost || 0);
-      setRemaining(first?.remainingBudget ?? 0);
-      setPlanSource("generated");
-      localStorage.setItem("currentPlanSource", "generated");
+      setMealPlan([]);
+      setTotalCost(0);
+      setRemaining(numericBudget);
+      setPlanSource(null);
+      localStorage.removeItem("currentPlanSource");
 
       toast.success("Meal plans ready", {
         id: toastId,
         description: `${opts.length} option${opts.length > 1 ? "s" : ""} generated for you.`,
+         icon: <CheckCircle2 className="text-[#046d6d]" />,
       });
 
       scrollToRef(refOptions);
@@ -439,6 +455,7 @@ const [mealType, setMealType] =
       toast.error("Generation failed", {
         id: toastId,
         description: "Something went wrong. Please try again.",
+         icon: <AlertCircle className="text-red-500" />,
       });
     } finally {
       setLoading(false);
@@ -494,7 +511,10 @@ const [mealType, setMealType] =
     setPlanSource("manual");
     localStorage.setItem("currentPlanSource", "manual");
 
-    toast.success("Meal added manually");
+    toast.success("Meal added manually", {
+      icon: <CheckCircle2 className="text-[#046d6d]" />,
+    });
+
   };
 
   const handleManualAdd = (meal: Meal) => {
@@ -551,13 +571,19 @@ const [mealType, setMealType] =
 
       if (latestPlanData.ok && latestPlanData.mealPlan) {
         const savedPlan = latestPlanData.mealPlan;
+        const savedMeals = savedPlan.meals ?? [];
 
-        setMealPlan(savedPlan.meals ?? []);
+        setMealPlan(savedMeals);
         setTotalCost(savedPlan.totalCost ?? 0);
         setRemaining(savedPlan.remainingBudget ?? 0);
-        setPlanSource("generated");
-        localStorage.setItem("currentPlanSource", "generated");
-        
+
+        if (savedMeals.length > 0) {
+          setPlanSource("generated");
+          localStorage.setItem("currentPlanSource", "generated");
+        } else {
+          setPlanSource(null);
+          localStorage.removeItem("currentPlanSource");
+        }
 
         if (savedPlan.budget) setBudget(String(savedPlan.budget));
         if (savedPlan.allowanceType) setAllowanceType(savedPlan.allowanceType);
@@ -631,6 +657,7 @@ const [mealType, setMealType] =
       toast.success("Meal plan saved!", {
         id: toastId,
         description: "Your plan is now in history.",
+        icon: <CheckCircle2 className="text-[#046d6d]" />,
       });
 
       await refreshUserMealPlanData();
@@ -646,7 +673,7 @@ const [mealType, setMealType] =
     }
   };
 
-  const handleRemoveMeal = (index: number) => {
+  const handleRemoveMeal = async (index: number) => {
   const updatedMeals = mealPlan.filter((_, i) => i !== index);
 
   const updatedTotal = updatedMeals.reduce(
@@ -654,13 +681,98 @@ const [mealType, setMealType] =
     0
   );
 
-  setMealPlan(updatedMeals);
-  setTotalCost(updatedTotal);
-  setRemaining(Math.max(0, numericBudget - updatedTotal));
+  const updatedRemaining = Math.max(0, numericBudget - updatedTotal);
 
   if (planSource === "manual") {
-    localStorage.setItem("manualMealPlan", JSON.stringify(updatedMeals));
+    setMealPlan(updatedMeals);
+    setTotalCost(updatedTotal);
+    setRemaining(updatedRemaining);
+
+    if (updatedMeals.length > 0) {
+      localStorage.setItem("manualMealPlan", JSON.stringify(updatedMeals));
+      localStorage.setItem("currentPlanSource", "manual");
+    } else {
+      localStorage.removeItem("manualMealPlan");
+      localStorage.removeItem("currentPlanSource");
+      setPlanSource(null);
+    }
+
+    toast.success("Meal removed", {
+      icon: <CheckCircle2 className="text-[#046d6d]" />,
+    });
+    return;
   }
+
+  if (planSource === "generated") {
+    const userId = localStorage.getItem("userId");
+
+    if (!userId) {
+      toast.error("Please login first");
+      return;
+    }
+
+    const previousMeals = mealPlan;
+    const previousTotal = totalCost;
+    const previousRemaining = remaining;
+
+    setMealPlan(updatedMeals);
+    setTotalCost(updatedTotal);
+    setRemaining(updatedRemaining);
+
+    if (updatedMeals.length === 0) {
+      setPlanSource(null);
+    }
+
+    const toastId = toast.loading("Removing meal...");
+
+    try {
+      const res = await fetch("/api/mealplans/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          meals: updatedMeals,
+          totalCost: updatedTotal,
+          remainingBudget: updatedRemaining,
+          isCustomized: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to update meal plan");
+      }
+
+      if (updatedMeals.length > 0) {
+        setPlanSource("generated");
+        localStorage.setItem("currentPlanSource", "generated");
+      } else {
+        localStorage.removeItem("currentPlanSource");
+      }
+
+      toast.success("Meal removed", { id: toastId, icon: <CheckCircle2 className="text-[#046d6d]" /> });
+      await refreshUserMealPlanData();
+    } catch (error) {
+      console.error(error);
+
+      setMealPlan(previousMeals);
+      setTotalCost(previousTotal);
+      setRemaining(previousRemaining);
+      setPlanSource(previousMeals.length > 0 ? "generated" : null);
+
+      toast.error("Failed to remove meal", {
+        id: toastId,
+        description: "Please try again.",
+      });
+    }
+
+    return;
+  }
+
+  setMealPlan(updatedMeals);
+  setTotalCost(updatedTotal);
+  setRemaining(updatedRemaining);
 
   if (updatedMeals.length === 0) {
     setPlanSource(null);
@@ -668,7 +780,9 @@ const [mealType, setMealType] =
     localStorage.removeItem("currentPlanSource");
   }
 
-  toast.success("Meal removed");
+  toast.success("Meal removed", {
+    icon: <CheckCircle2 className="text-[#046d6d]" />,
+  }); 
 };
 
   
@@ -709,9 +823,9 @@ const [mealType, setMealType] =
   }
 
   const visibleOptions = (showAllOptions ? options : options.slice(0, 3)).map(
-    (option) => ({
+    (option, index) => ({
       option,
-      originalIndex: options.indexOf(option),
+      originalIndex: index,
     })
   );
 
@@ -892,9 +1006,11 @@ const [mealType, setMealType] =
                       </div>
 
                       <div className="rounded-full bg-[#E3F2FD] px-3 py-1 text-xs font-medium text-[#023030]">
-                        {mealPlan.length > 0
-                          ? `${mealPlan.length} meals`
-                          : "No plan yet"}
+                        {mealPlan.length === 0
+                          ? "No plan yet"
+                          : planSource === "manual"
+                          ? "Manual plan"
+                          : "Chosen plan"}
                       </div>
                     </div>
 
@@ -961,11 +1077,10 @@ const [mealType, setMealType] =
                     ) : (
                       <div className="rounded-[22px] border border-white/35 bg-[linear-gradient(135deg,rgba(255,255,255,0.50),rgba(227,242,253,0.30),rgba(204,255,232,0.18))] p-4 backdrop-blur-lg">
                         <p className="font-poppins text-sm font-medium text-[#023030]">
-                          No meal plan selected yet
+                          No chosen meal plan yet
                         </p>
                         <p className="font-helvetica mt-1 text-sm font-light leading-6 text-[#023030]/65">
-                          Generate meal plans to see several budget-friendly
-                          options you can choose from.
+                          Generate meal plans below, then choose one to make it your current plan.
                         </p>
                       </div>
                     )}
@@ -1330,6 +1445,7 @@ const [mealType, setMealType] =
 
                 toast.success("Day concluded", {
                   description: "Your current plan has been cleared.",
+                  icon: <CheckCircle2 className="text-[#046d6d]" />, 
                 });
               } catch (error) {
                 console.error(error);

@@ -36,7 +36,14 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} antialiased`}
       >
         {children}
-        <Toaster richColors/>
+        <Toaster
+          position="bottom-right"
+          expand
+          toastOptions={{
+            className:
+              "font-poppins flex items-center gap-3 px-4 py-3 rounded-2xl border border-white/50 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(247,251,251,0.90))] text-[#023030] backdrop-blur-2xl shadow-[0_12px_32px_rgba(2,48,48,0.12)]",
+          }}
+        />
       </body>
     </html>
   );

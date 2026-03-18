@@ -36,6 +36,7 @@ const MealPlanSchema = new Schema(
     score: { type: Number, default: 0 },
     label: { type: String, default: "" },
     selected: { type: Boolean, default: true },
+    isCustomized: { type: Boolean, default: false },
     meals: { type: [SavedMealSchema], default: [] },
   },
   { timestamps: true }
