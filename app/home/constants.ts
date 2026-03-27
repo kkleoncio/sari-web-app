@@ -22,12 +22,10 @@ export type NavKey =
 export type EstablishmentCard = {
   id: string;
   name: string;
-  address: string;
-  distanceM: number;
-  rating: number;
-  priceMin: number;
-  priceMax: number;
-  hours: string;
+  location: string;
+  openingHours: string;
   tags: string[];
   imageUrl: string;
+  priceRange: string;
+  healthScore?: number;
 };

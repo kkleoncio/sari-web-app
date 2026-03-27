@@ -154,8 +154,37 @@ const [pendingMeal, setPendingMeal] = React.useState<Meal | null>(null);
 
   if (!authChecked || loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-[#023030]">
-        Loading menu...
+      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#e6f7f1_0%,#f7fbfb_45%,#eef8f4_100%)] px-6">
+        <div className="w-full max-w-sm p-7 backdrop-blur-2xl">
+          
+          {/* 🍜 Icon / Spinner */}
+          <div className="mb-5 flex flex-col items-center text-center">
+            <h2 className="font-poppins text-lg font-semibold text-[#023030]">
+              Loading Menu
+            </h2>
+            <p className="mt-1 font-poppins text-sm text-[#023030]/65">
+              Checking what's available for you...
+            </p>
+          </div>
+
+          {/* 🍃 Progress bar */}
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#023030]/8">
+            <div className="h-full w-1/3 animate-[loading_1.2s_ease-in-out_infinite] rounded-full bg-[linear-gradient(90deg,#0b6b57_0%,#34d399_50%,#0b6b57_100%)]" />
+          </div>
+
+          {/* ✨ Cute dots */}
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-[#023030]/55">
+            <span className="h-2 w-2 animate-bounce rounded-full bg-[#0b6b57]" />
+            <span
+              className="h-2 w-2 animate-bounce rounded-full bg-[#0b6b57]"
+              style={{ animationDelay: "0.15s" }}
+            />
+            <span
+              className="h-2 w-2 animate-bounce rounded-full bg-[#0b6b57]"
+              style={{ animationDelay: "0.3s" }}
+            />
+          </div>
+        </div>
       </div>
     );
   }

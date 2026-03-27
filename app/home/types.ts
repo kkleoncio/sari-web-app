@@ -5,16 +5,21 @@ export type Meal = {
   category: string;
   price: number;
   establishmentName: string;
-  establishmentCategory: string;
-  location: string;
-  mealTime: string[];
-  healthScore: number;
-  isFried: boolean;
-  isSoup: boolean;
-  isVegetarian: boolean;
-  tags: string[];
-  allergens: string[];
-  isAvailable: boolean;
+  establishmentCategory?: string;
+  location?: string;
+  mealTime?: string[];
+  healthScore?: number;
+  fillingScore?: number;
+  isFried?: boolean;
+  isSoup?: boolean;
+  isVegetarian?: boolean;
+  isProcessedMeat?: boolean;
+  tags?: string[];
+  allergens?: string[];
+  mealQuality?: "main" | "light" | "drink";
+  dayIndex?: number;
+  dayLabel?: string;
+  slot?: string;
 };
 
 export type Establishment = {
@@ -49,14 +54,12 @@ export type NavKey =
 export type EstablishmentCard = {
   id: string;
   name: string;
-  address: string;
-  hours: string;
+  location: string;
+  openingHours: string;
   tags: string[];
   imageUrl: string;
-  distanceM: number;
-  rating: number;
-  priceMin: number;
-  priceMax: number;
+  priceRange: string;
+  healthScore?: number;
 };
 
 export type MenuItem = {

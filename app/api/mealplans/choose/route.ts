@@ -22,6 +22,44 @@ type MealDTO = {
   allergens?: string[];
 };
 
+type WeeklyDayDTO = {
+  day: number;
+  label: string;
+  budget?: number;
+  meals: MealDTO[];
+  totalCost: number;
+  remainingBudget: number;
+};
+
+type SelectedOptionDTO = {
+  meals?: MealDTO[];
+  days?: WeeklyDayDTO[];
+  totalCost: number;
+  remainingBudget: number;
+  score?: number;
+  label?: string;
+};
+
+function normalizeMeal(meal: MealDTO) {
+  return {
+    _id: meal._id,
+    mealName: meal.mealName,
+    price: Number(meal.price ?? 0),
+    establishmentName: meal.establishmentName,
+    establishmentCategory: meal.establishmentCategory ?? "",
+    location: meal.location ?? "",
+    foodType: meal.foodType ?? "",
+    category: meal.category ?? "",
+    mealTime: Array.isArray(meal.mealTime) ? meal.mealTime : [],
+    healthScore: Number(meal.healthScore ?? 5),
+    isFried: meal.isFried ?? false,
+    isSoup: meal.isSoup ?? false,
+    isVegetarian: meal.isVegetarian ?? false,
+    tags: Array.isArray(meal.tags) ? meal.tags : [],
+    allergens: Array.isArray(meal.allergens) ? meal.allergens : [],
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const {
@@ -35,17 +73,10 @@ export async function POST(req: Request) {
       allowanceType?: AllowanceType;
       budget: number;
       mealsPerDay?: number;
-      selectedOption: {
-        meals: MealDTO[];
-        totalCost: number;
-        remainingBudget: number;
-        score?: number;
-        label?: string;
-      };
+      selectedOption: SelectedOptionDTO;
     } = await req.json();
 
     const numericBudget = Number(budget);
-    const numericMealsPerDay = Number(mealsPerDay ?? selectedOption?.meals?.length);
 
     if (!userId) {
       return NextResponse.json(
@@ -61,11 +92,71 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!selectedOption?.meals?.length) {
+    if (!selectedOption || typeof selectedOption !== "object") {
       return NextResponse.json(
-        { ok: false, message: "selectedOption with meals is required" },
+        { ok: false, message: "selectedOption is required" },
         { status: 400 }
       );
+    }
+
+    let normalizedMeals: ReturnType<typeof normalizeMeal>[] = [];
+    let normalizedDays: any[] = [];
+    let numericMealsPerDay = Number(mealsPerDay ?? 0);
+
+    if (allowanceType === "weekly") {
+      if (!Array.isArray(selectedOption.days) || !selectedOption.days.length) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: "selectedOption with days is required for weekly plans",
+          },
+          { status: 400 }
+        );
+      }
+
+      normalizedDays = selectedOption.days.map((day) => ({
+        day: Number(day.day),
+        label: day.label ?? "",
+        budget:
+          day.budget !== undefined && day.budget !== null
+            ? Number(day.budget)
+            : undefined,
+        meals: Array.isArray(day.meals)
+          ? day.meals.map((meal) => normalizeMeal(meal))
+          : [],
+        totalCost: Number(day.totalCost ?? 0),
+        remainingBudget: Number(day.remainingBudget ?? 0),
+      }));
+
+      normalizedMeals = normalizedDays.flatMap((day) => day.meals);
+
+      if (!normalizedMeals.length) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: "Weekly selectedOption must contain meals inside days",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (Number.isNaN(numericMealsPerDay) || numericMealsPerDay <= 0) {
+        const firstDayMealCount = normalizedDays[0]?.meals?.length ?? 0;
+        numericMealsPerDay = firstDayMealCount;
+      }
+    } else {
+      if (!Array.isArray(selectedOption.meals) || !selectedOption.meals.length) {
+        return NextResponse.json(
+          { ok: false, message: "selectedOption with meals is required" },
+          { status: 400 }
+        );
+      }
+
+      normalizedMeals = selectedOption.meals.map((meal) => normalizeMeal(meal));
+
+      if (Number.isNaN(numericMealsPerDay) || numericMealsPerDay <= 0) {
+        numericMealsPerDay = normalizedMeals.length;
+      }
     }
 
     await connectToDatabase();
@@ -75,25 +166,7 @@ export async function POST(req: Request) {
       { $set: { selected: false } }
     );
 
-    const normalizedMeals = selectedOption.meals.map((meal) => ({
-      _id: meal._id,
-      mealName: meal.mealName,
-      price: Number(meal.price ?? 0),
-      establishmentName: meal.establishmentName,
-      establishmentCategory: meal.establishmentCategory ?? "",
-      location: meal.location ?? "",
-      foodType: meal.foodType ?? "",
-      category: meal.category ?? "",
-      mealTime: meal.mealTime ?? [],
-      healthScore: meal.healthScore ?? 5,
-      isFried: meal.isFried ?? false,
-      isSoup: meal.isSoup ?? false,
-      isVegetarian: meal.isVegetarian ?? false,
-      tags: meal.tags ?? [],
-      allergens: meal.allergens ?? [],
-    }));
-
-    const mealPlan = new MealPlan({
+    const mealPlanData: any = {
       userId,
       allowanceType,
       budget: numericBudget,
@@ -105,7 +178,13 @@ export async function POST(req: Request) {
       selected: true,
       isCustomized: false,
       meals: normalizedMeals,
-    });
+    };
+
+    if (allowanceType === "weekly") {
+      mealPlanData.days = normalizedDays;
+    }
+
+    const mealPlan = new MealPlan(mealPlanData);
 
     await mealPlan.save();
 
