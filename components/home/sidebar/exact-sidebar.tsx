@@ -343,7 +343,7 @@ export function ExactSidebar({ active, onChange }: ExactSidebarProps) {
                     label="View profile"
                     onClick={() => {
                       setOpenAccountMenu(false);
-                      router.push("/home/profile");
+                      router.push("/profile");
                     }}
                   />
 

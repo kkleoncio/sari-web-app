@@ -116,55 +116,6 @@ export function ConcludeDayModal({
               </div>
             </div>
 
-            {/* <div className="rounded-[24px] border border-white/40 bg-white/65 p-4 shadow-[0_10px_24px_rgba(2,48,48,0.06)]">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-poppins text-sm font-semibold text-[#023030]">
-                    Meals today
-                  </p>
-                  <p className="text-xs text-[#023030]/58">
-                    {meals.length > 0
-                      ? `${meals.length} meal${meals.length > 1 ? "s" : ""} in your plan`
-                      : "No meals selected yet"}
-                  </p>
-                </div>
-
-                <div className="rounded-full bg-[#E3F2FD] px-3 py-1 text-[11px] font-medium text-[#023030]">
-                  {planLabel || "Selected plan"}
-                </div>
-              </div>
-
-              {meals.length > 0 ? (
-                <div className="space-y-2.5">
-                  {meals.map((meal, index) => (
-                    <div
-                      key={`${meal.mealName}-${index}`}
-                      className="flex items-center justify-between rounded-2xl border border-white/35 bg-white/60 px-3 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-poppins truncate text-sm font-medium text-[#023030]">
-                          {meal.mealName}
-                        </p>
-                        <p className="truncate text-xs text-[#023030]/55">
-                          {meal.establishmentName}
-                        </p>
-                      </div>
-
-                      <span className="ml-3 shrink-0 rounded-full bg-[#E3F2FD] px-2.5 py-1 text-xs font-semibold text-[#023030]">
-                        {formatPeso(meal.price)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-white/35 bg-white/60 px-4 py-3">
-                  <p className="font-poppins text-sm font-medium text-[#023030]">
-                    No meal plan to summarize yet
-                  </p>
-                </div>
-              )}
-            </div> */}
-
             <div className="rounded-[24px] border border-white/40 bg-[linear-gradient(135deg,rgba(255,255,255,0.75),rgba(227,242,253,0.40),rgba(204,255,232,0.25))] p-4">
               <p className="font-poppins text-sm font-semibold text-[#023030]">
                 Daily insight

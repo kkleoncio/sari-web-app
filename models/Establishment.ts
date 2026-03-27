@@ -11,6 +11,7 @@ const EstablishmentSchema = new Schema(
       type: String,
       required: true,
       trim: true,
+      enum: ["Carinderia", "Cafeteria", "Restaurant", "Food Stall", "Bakery", "Milk Tea Shop", "Snack House"],
     },
     location: {
       type: String,
@@ -19,13 +20,13 @@ const EstablishmentSchema = new Schema(
     },
     priceRange: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
     openingHours: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
     isOpen: {
       type: Boolean,

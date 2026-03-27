@@ -11,11 +11,29 @@ const MealSchema = new Schema(
       type: String,
       required: true,
       trim: true,
+      enum: [
+        "rice_meal",
+        "silog",
+        "noodles",
+        "pasta",
+        "burger",
+        "sandwich",
+        "snack",
+        "drink",
+        "dessert",
+        "viand",
+        "combo",
+        "rice_bowl",
+        "soup",
+        "wrap",
+        "sizzler",
+      ],
     },
     category: {
       type: String,
       required: true,
       trim: true,
+      enum: ["main", "snack", "drink", "dessert", "side"],
     },
     price: {
       type: Number,
@@ -47,6 +65,12 @@ const MealSchema = new Schema(
       min: 1,
       max: 10,
     },
+    fillingScore: {
+      type: Number,
+      default: 5,
+      min: 1,
+      max: 10,
+    },
     isFried: {
       type: Boolean,
       default: false,
@@ -56,6 +80,10 @@ const MealSchema = new Schema(
       default: false,
     },
     isVegetarian: {
+      type: Boolean,
+      default: false,
+    },
+    isProcessedMeat: {
       type: Boolean,
       default: false,
     },

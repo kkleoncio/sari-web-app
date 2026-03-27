@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { MapPin, Store, Sparkles } from "lucide-react";
+import { Store } from "lucide-react";
 
 import type { EstablishmentCard } from "@/app/home/types";
 import { EstablishmentItem } from "@/components/home/cards/estab-item";
@@ -34,7 +34,6 @@ type EstablishmentsSectionProps = {
   stagger: StaggerType;
   establishments: EstablishmentCard[];
   totalCount: number;
-  showAll: boolean;
   onToggleShowAll: () => void;
 };
 
@@ -43,80 +42,46 @@ export function EstablishmentsSection({
   fadeUp,
   stagger,
   establishments,
-  totalCount,
-  showAll,
   onToggleShowAll,
 }: EstablishmentsSectionProps) {
   return (
     <section ref={innerRef} className="scroll-mt-8 space-y-4">
       <motion.div
-        className="rounded-[28px] border border-white/40 bg-white/50 p-5 shadow-[0_10px_30px_rgba(2,48,48,0.08)] backdrop-blur-xl md:p-6"
+        className="px-1 md:px-2"
         variants={fadeUp}
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, amount: 0.2 }}
       >
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-[#FBE1AD] px-3 py-1.5 text-xs font-medium text-[#025a5a] backdrop-blur-md">
-              <Store className="h-3.5 w-3.5" />
-              Food spots near you
-            </div>
-
-            <h2 className="font-poppins mt-4 text-2xl font-semibold text-[#023030] md:text-[28px]">
-              Places to eat around Elbi
-            </h2>
-
-            <p className="font-helvetica mt-2 text-sm font-light leading-6 text-[#023030]/68 md:text-[15px]">
-              Browse nearby food spots, compare prices, and find places that feel
-              student-budget friendly.
-            </p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <div className="rounded-full border border-white/40 bg-white/45 px-3 py-1.5 text-xs text-[#023030]/80">
-                Near UPLB
-              </div>
-              <div className="rounded-full border border-white/40 bg-white/45 px-3 py-1.5 text-xs text-[#023030]/80">
-                Budget-friendly
-              </div>
-              <div className="rounded-full border border-white/40 bg-white/45 px-3 py-1.5 text-xs text-[#023030]/80">
-                Student picks
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 lg:w-[360px]">
-            <div className="rounded-2xl border border-white/35 bg-[linear-gradient(135deg,rgba(255,255,255,0.52),rgba(227,242,253,0.36),rgba(204,255,232,0.22))] p-4 backdrop-blur-lg">
-              <div className="mb-2 inline-flex rounded-xl bg-[#E3F2FD] p-2 text-[#023030]">
-                <Store className="h-4 w-4" />
-              </div>
-              <p className="font-helvetica text-xs text-[#023030]/60">Places</p>
-              <p className="font-poppins mt-1 text-lg font-semibold text-[#023030]">
-                {totalCount}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/35 bg-[linear-gradient(135deg,rgba(255,255,255,0.52),rgba(227,242,253,0.36),rgba(204,255,232,0.22))] p-4 backdrop-blur-lg">
-              <div className="mb-2 inline-flex rounded-xl bg-[#E3F2FD] p-2 text-[#023030]">
-                <MapPin className="h-4 w-4" />
-              </div>
-              <p className="font-helvetica text-xs text-[#023030]/60">Closest</p>
-              <p className="font-poppins mt-1 text-lg font-semibold text-[#023030]">
-                150m
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/35 bg-[linear-gradient(135deg,rgba(255,255,255,0.52),rgba(227,242,253,0.36),rgba(204,255,232,0.22))] p-4 backdrop-blur-lg">
-              <div className="mb-2 inline-flex rounded-xl bg-[#E3F2FD] p-2 text-[#023030]">
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <p className="font-helvetica text-xs text-[#023030]/60">Vibe</p>
-              <p className="font-poppins mt-1 text-lg font-semibold text-[#023030]">
-                Sulit
-              </p>
-            </div>
-          </div>
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-xs font-medium text-[#025a5a] backdrop-blur-xl shadow-[0_8px_24px_rgba(2,48,48,0.12)]">
+          <Store className="h-3.5 w-3.5" />
+          Food spots near you
         </div>
+
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <h2 className="font-poppins text-2xl font-semibold text-[#023030] md:text-[28px]">
+            Places to eat around Elbi
+          </h2>
+
+          <button
+            onClick={onToggleShowAll}
+            className="hidden shrink-0 text-sm font-medium text-[#026d6d] hover:underline lg:inline-flex"
+          >
+            View all →
+          </button>
+        </div>
+
+        <p className="font-helvetica mt-2 max-w-xl text-sm font-light leading-6 text-[#023030]/68 md:text-[15px]">
+          Browse nearby food spots, compare prices, and find places that feel
+          student-budget friendly.
+        </p>
+
+        <button
+          onClick={onToggleShowAll}
+          className="mt-4 inline-flex text-sm font-medium text-[#026d6d] hover:underline lg:hidden"
+        >
+          View all →
+        </button>
       </motion.div>
 
       <motion.div
@@ -131,17 +96,6 @@ export function EstablishmentsSection({
           </motion.div>
         ))}
       </motion.div>
-
-      {totalCount > 6 && (
-        <div className="mt-5 flex justify-center">
-          <button
-            onClick={onToggleShowAll}
-            className="font-poppins rounded-xl border border-white/45 bg-white/55 px-4 py-2 text-sm text-[#023030] backdrop-blur-md transition hover:bg-white/75"
-          >
-            {showAll ? "Show less" : `Show more places (${totalCount})`}
-          </button>
-        </div>
-      )}
     </section>
   );
 }
