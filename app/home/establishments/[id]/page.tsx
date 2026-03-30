@@ -7,6 +7,7 @@ import { ArrowLeft, MapPin, Clock3, Plus, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ReplaceGeneratedPlanModal } from "@/components/home/modals/replace-generated-plan-modal";
+import { useSession } from "next-auth/react";
 
 type Establishment = {
   _id: string;
@@ -36,10 +37,8 @@ type Meal = {
 
 export default function EstablishmentMenuPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params.id as string;
-
-  const [authChecked, setAuthChecked] = React.useState(false);
+  const { status } = useSession();
   const [loading, setLoading] = React.useState(true);
   const [establishment, setEstablishment] = React.useState<Establishment | null>(null);
   const [meals, setMeals] = React.useState<Meal[]>([]);
@@ -47,20 +46,9 @@ export default function EstablishmentMenuPage() {
   React.useState(false);
 const [pendingMeal, setPendingMeal] = React.useState<Meal | null>(null);
 
-  React.useEffect(() => {
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    const userId = localStorage.getItem("userId");
 
-    if (!isLoggedIn || !userId) {
-      router.replace("/auth/login");
-      return;
-    }
-
-    setAuthChecked(true);
-  }, [router]);
-
-  React.useEffect(() => {
-    if (!authChecked || !id) return;
+React.useEffect(() => {
+  if (status !== "authenticated" || !id) return;
 
     async function loadData() {
       try {
@@ -95,7 +83,7 @@ const [pendingMeal, setPendingMeal] = React.useState<Meal | null>(null);
     }
 
     loadData();
-  }, [authChecked, id]);
+}, [status, id]);
 
   const addMealToManualPlan = (meal: Meal) => {
   const budget = Number(localStorage.getItem("currentBudget") || "0");
@@ -152,7 +140,7 @@ const [pendingMeal, setPendingMeal] = React.useState<Meal | null>(null);
     addMealToManualPlan(mealToAdd);
   };
 
-  if (!authChecked || loading) {
+if (status === "loading" || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#e6f7f1_0%,#f7fbfb_45%,#eef8f4_100%)] px-6">
         <div className="w-full max-w-sm p-7 backdrop-blur-2xl">

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Poppins } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
-
+import { AuthSessionProvider } from "@/components/providers/session-provider";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -35,20 +35,21 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} antialiased`}
       >
-        {children}
-        <Toaster
-          position="bottom-right"
-          expand
-          toastOptions={{
-            classNames: {
-              toast:
-                "font-poppins flex items-center gap-3 px-4 py-3 rounded-2xl border border-[#023030]/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(234,248,244,0.92))] backdrop-blur-xl shadow-[0_10px_30px_rgba(2,48,48,0.12)] [&_[data-title]]:text-[#023030] [&_[data-title]]:font-semibold [&_[data-description]]:!text-[#023030]/80 [&_[data-description]]:!opacity-100 [&_[data-description]]:text-sm",
-  
-              title: "text-[#023030] font-semibold",
-              description: "!text-[#023030]/80 text-sm !opacity-100",
-            },
-          }}
-        />
+        <AuthSessionProvider>
+          {children}
+          <Toaster
+            position="bottom-right"
+            expand
+            toastOptions={{
+              classNames: {
+                toast:
+                  "font-poppins flex items-center gap-3 px-4 py-3 rounded-2xl border border-[#023030]/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(234,248,244,0.92))] backdrop-blur-xl shadow-[0_10px_30px_rgba(2,48,48,0.12)] [&_[data-title]]:text-[#023030] [&_[data-title]]:font-semibold [&_[data-description]]:!text-[#023030]/80 [&_[data-description]]:!opacity-100 [&_[data-description]]:text-sm",
+                title: "text-[#023030] font-semibold",
+                description: "!text-[#023030]/80 text-sm !opacity-100",
+              },
+            }}
+          />
+        </AuthSessionProvider>
       </body>
     </html>
   );

@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     const body = await req.json();
+
     const firstName = body.firstName?.trim();
     const lastName = body.lastName?.trim();
     const email = body.email?.trim().toLowerCase();
@@ -21,9 +22,15 @@ export async function POST(req: NextRequest) {
     }
 
     const existingUser = await User.findOne({ email });
+
     if (existingUser) {
       return NextResponse.json(
-        { message: "Email already exists" },
+        {
+          message:
+            existingUser.authProvider === "google"
+              ? "This email is already registered with Google. Please sign in with Google."
+              : "Email already exists",
+        },
         { status: 400 }
       );
     }
@@ -35,12 +42,17 @@ export async function POST(req: NextRequest) {
       lastName,
       email,
       password: hashedPassword,
+      role: "user",
+      authProvider: "credentials",
     });
 
     return NextResponse.json(
       {
         message: "User created successfully",
-        userId: user._id,
+        userId: String(user._id),
+        firstName: user.firstName,
+        email: user.email,
+        role: user.role || "user",
       },
       { status: 201 }
     );

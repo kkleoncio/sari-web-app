@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSession, signOut } from "next-auth/react";
 import {
   ArrowLeft,
   Mail,
@@ -33,6 +34,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { EditProfileModal } from "@/components/profile/edit-profile-modal";
+import { useRouter } from "next/navigation";
+import { LogoutConfirmationModal } from "@/components/home/modals/logout-confirmation-modal";
 
 type ProfileData = {
   name: string;
@@ -259,6 +262,8 @@ function getVibeBadges(
 }
 
 export default function ProfilePage() {
+  const { data: session, status } = useSession();
+const userId = session?.user?.id ?? "";
   const [editOpen, setEditOpen] = React.useState(false);
   const [loadingPosts, setLoadingPosts] = React.useState(true);
   const [loadingHistory, setLoadingHistory] = React.useState(true);
@@ -266,10 +271,9 @@ export default function ProfilePage() {
   const [userPosts, setUserPosts] = React.useState<UserPost[]>([]);
   const [historyItems, setHistoryItems] = React.useState<HistoryItem[]>([]);
   const [savedMeals, setSavedMeals] = React.useState<Meal[]>([]);
-  const [activeTab, setActiveTab] = React.useState<"posts" | "history" >(
-    "posts"
-  );
-
+  const [activeTab, setActiveTab] = React.useState<"posts" | "history" >("posts");
+  const router = useRouter();
+  const [logoutOpen, setLogoutOpen] = React.useState(false);
   const [profile, setProfile] = React.useState<ProfileData>({
     name: "",
     username: "",
@@ -294,73 +298,101 @@ export default function ProfilePage() {
     favoriteFood: "",
   });
 
-  const userId =
-    typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
 
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    async function loadProfile() {
+      if (typeof window === "undefined") return;
 
-    const savedProfileRaw = localStorage.getItem("sariProfile");
-    const firstName = localStorage.getItem("firstName") || "";
-    const email = localStorage.getItem("userEmail") || "";
-    const manualMealsRaw = localStorage.getItem("manualMealPlan") || "[]";
+      if (!userId) return;
 
-    const manualMeals: Meal[] = JSON.parse(manualMealsRaw);
+      const savedProfileRaw = localStorage.getItem(`sariProfile:${userId}`);
+      const manualMealsRaw = localStorage.getItem("manualMealPlan") || "[]";
 
-    setSavedMeals(manualMeals);
-    setLoadingSaved(false);
+      const manualMeals: Meal[] = JSON.parse(manualMealsRaw);
 
-    const uniqueEstablishments = new Set(
-      manualMeals.map((meal) => meal.establishmentName).filter(Boolean)
-    );
+      setSavedMeals(manualMeals);
+      setLoadingSaved(false);
 
-    const defaultProfile: ProfileData = {
-      name: firstName || "SARI User",
-      username: firstName ? `@${firstName.toLowerCase()}` : "@sariuser",
-      email,
-      location: "Los Baños, Laguna",
-      bio: "",
-      budgetStyle: "",
-      favoriteFood: "",
-      mealsSaved: manualMeals.length,
-      plansGenerated: 0,
-      establishmentsExplored: uniqueEstablishments.size,
-      joinedLabel: "Joined SARI",
-    };
+      const uniqueEstablishments = new Set(
+        manualMeals.map((meal) => meal.establishmentName).filter(Boolean)
+      );
 
-    if (savedProfileRaw) {
-      const savedProfile = JSON.parse(savedProfileRaw);
+      let dbFirstName = "";
+      let dbLastName = "";
+      let dbEmail = "";
 
-      const mergedProfile: ProfileData = {
-        ...defaultProfile,
-        ...savedProfile,
+      try {
+        const res = await fetch(`/api/users/${userId}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+
+        if (res.ok && data?.user) {
+          dbFirstName = data.user.firstName || "";
+          dbLastName = data.user.lastName || "";
+          dbEmail = data.user.email || "";
+
+          localStorage.setItem("firstName", dbFirstName);
+          localStorage.setItem("userEmail", dbEmail);
+        }
+      } catch (error) {
+        console.error("Failed to load user profile:", error);
+      }
+
+      const fullName = [dbFirstName, dbLastName].filter(Boolean).join(" ").trim();
+
+      const defaultProfile: ProfileData = {
+        name: fullName || dbFirstName || "SARI User",
+        username: dbFirstName ? `@${dbFirstName.toLowerCase()}` : "@sariuser",
+        email: dbEmail,
+        location: "Los Baños, Laguna",
+        bio: "",
+        budgetStyle: "",
+        favoriteFood: "",
         mealsSaved: manualMeals.length,
+        plansGenerated: 0,
         establishmentsExplored: uniqueEstablishments.size,
+        joinedLabel: "Joined SARI",
       };
 
-      setProfile(mergedProfile);
-      setFormData({
-        name: mergedProfile.name,
-        username: mergedProfile.username,
-        email: mergedProfile.email,
-        location: mergedProfile.location,
-        bio: mergedProfile.bio,
-        budgetStyle: mergedProfile.budgetStyle,
-        favoriteFood: mergedProfile.favoriteFood,
-      });
-    } else {
-      setProfile(defaultProfile);
-      setFormData({
-        name: defaultProfile.name,
-        username: defaultProfile.username,
-        email: defaultProfile.email,
-        location: defaultProfile.location,
-        bio: defaultProfile.bio,
-        budgetStyle: defaultProfile.budgetStyle,
-        favoriteFood: defaultProfile.favoriteFood,
-      });
+      if (savedProfileRaw) {
+        const savedProfile = JSON.parse(savedProfileRaw);
+
+        const mergedProfile: ProfileData = {
+          ...defaultProfile,
+          ...savedProfile,
+          name: savedProfile.name || defaultProfile.name,
+          email: savedProfile.email || defaultProfile.email,
+          mealsSaved: manualMeals.length,
+          establishmentsExplored: uniqueEstablishments.size,
+        };
+
+        setProfile(mergedProfile);
+        setFormData({
+          name: mergedProfile.name,
+          username: mergedProfile.username,
+          email: mergedProfile.email,
+          location: mergedProfile.location,
+          bio: mergedProfile.bio,
+          budgetStyle: mergedProfile.budgetStyle,
+          favoriteFood: mergedProfile.favoriteFood,
+        });
+      } else {
+        setProfile(defaultProfile);
+        setFormData({
+          name: defaultProfile.name,
+          username: defaultProfile.username,
+          email: defaultProfile.email,
+          location: defaultProfile.location,
+          bio: defaultProfile.bio,
+          budgetStyle: defaultProfile.budgetStyle,
+          favoriteFood: defaultProfile.favoriteFood,
+        });
+      }
     }
-  }, []);
+
+    loadProfile();
+  }, [userId]);
 
   React.useEffect(() => {
     async function loadMyPosts() {
@@ -404,8 +436,7 @@ export default function ProfilePage() {
     async function loadHistoryPreview() {
       if (typeof window === "undefined") return;
 
-      const localUserId = localStorage.getItem("userId");
-      if (!localUserId) {
+      if (!userId) {
         setHistoryItems([]);
         setLoadingHistory(false);
         return;
@@ -415,7 +446,7 @@ export default function ProfilePage() {
         setLoadingHistory(true);
 
         const res = await fetch(
-          `/api/mealplans/history?userId=${encodeURIComponent(localUserId)}`,
+          `/api/mealplans/history?userId=${encodeURIComponent(userId)}`,
           { cache: "no-store" }
         );
         const data = await res.json();
@@ -456,11 +487,11 @@ export default function ProfilePage() {
     }
 
     loadHistoryPreview();
-  }, []);
+  }, [userId]);
 
   function persistProfile(updatedProfile: ProfileData) {
     setProfile(updatedProfile);
-    localStorage.setItem("sariProfile", JSON.stringify(updatedProfile));
+    localStorage.setItem(`sariProfile:${userId}`, JSON.stringify(updatedProfile));
     localStorage.setItem(
       "firstName",
       updatedProfile.name.trim().split(" ")[0] || updatedProfile.name
@@ -518,6 +549,19 @@ export default function ProfilePage() {
     });
   }
 
+ async function handleLogout() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("manualMealPlan");
+    localStorage.removeItem("currentPlanSource");
+    localStorage.removeItem("currentBudget");
+    localStorage.removeItem("firstName");
+    localStorage.removeItem("userEmail");
+  }
+
+  setLogoutOpen(false);
+
+  await signOut({ redirectTo: "/auth/login" });
+}
   function togglePreference(field: "budgetStyle" | "favoriteFood", value: string) {
     const currentValues = parsePreferenceString(profile[field]);
     const exists = currentValues.includes(value);
@@ -580,6 +624,16 @@ export default function ProfilePage() {
     },
   ];
 
+  if (status === "loading") {
+  return (
+    <main className="min-h-screen px-4 py-5 text-[#1f2937] md:px-7">
+      <div className="mx-auto max-w-6xl">
+        <p className="font-poppins text-sm">Loading profile...</p>
+      </div>
+    </main>
+  );
+}
+
   return (
     <>
       <main
@@ -603,6 +657,7 @@ export default function ProfilePage() {
 
             <Button
               variant="outline"
+              onClick={() => setLogoutOpen(true)}
               className="rounded-2xl border-[#cfe8df] bg-white/80 px-5 text-[#134e4a] hover:bg-[#f8fffd]"
             >
               <LogOut className="mr-2 h-4 w-4" />
@@ -946,6 +1001,12 @@ export default function ProfilePage() {
         formData={formData}
         onChange={handleFieldChange}
         onSave={handleSaveProfile}
+      />
+
+      <LogoutConfirmationModal
+        open={logoutOpen}
+        onOpenChange={setLogoutOpen}
+        onConfirm={handleLogout}
       />
     </>
   );

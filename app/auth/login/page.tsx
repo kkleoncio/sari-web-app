@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const router = useRouter(); 
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -22,42 +23,30 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+      const result = await signIn("credentials", {
+        email: form.email,
+        password: form.password,
+        redirect: false,
+        redirectTo: "/home",
       });
 
-      const text = await res.text();
-      let data: any = {};
-
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        data = { message: text };
-      }
-
-      if (!res.ok) {
-        setError(data.message || `Login failed (${res.status})`);
+      if (result?.error) {
+        setError("Invalid email or password.");
         return;
       }
 
-      localStorage.setItem("userId", data.userId);
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("firstName", data.firstName || "");
-      localStorage.setItem("role", data.role || "user");
-
-      if (data.role === "admin") {
-        router.push("/admin");
-      } else {
-        router.push("/home");
-      }
+      router.push("/home");
+      router.refresh();
     } catch (err) {
       console.error("LOGIN ERROR:", err);
-      setError("Network error. Check server is running.");
+      setError("Network error. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleGoogleSignIn = async () => {
+    await signIn("google", { redirectTo: "/home" });
   };
 
   return (
@@ -194,8 +183,8 @@ export default function LoginPage() {
                   {/* Google */}
                   <button
                     type="button"
-                    disabled
-                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-300/40 bg-white/25 py-2.5 text-[13px] font-helvetica text-[#2c3531] transition hover:bg-white/35"
+                    onClick={handleGoogleSignIn}
+                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-300/40 bg-white/25 py-2.5 text-[13px] font-helvetica text-[#2c3531] transition hover:bg-black/1"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24">
                       <path
@@ -286,7 +275,7 @@ export default function LoginPage() {
         {/* Avatars */}
         <div className="absolute bottom-8 right-10 flex items-center">
           <img
-            src="/avatar1.jpg"
+            src="/avatar.png"
             className="h-8 w-8 rounded-full border-2 border-white object-cover"
           />
           <img

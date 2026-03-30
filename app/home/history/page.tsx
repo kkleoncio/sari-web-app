@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useSession } from "next-auth/react";
 import {
   ArrowLeft,
   CalendarDays,
@@ -87,6 +88,8 @@ function getAllowanceLabel(value: "daily" | "weekly") {
 export default function HistoryPage() {
   const router = useRouter();
 
+  const { data: session, status } = useSession();
+  const userId = session?.user?.id ?? "";
   const [historyItems, setHistoryItems] = React.useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = React.useState(true);
 
@@ -109,19 +112,17 @@ export default function HistoryPage() {
   }, []);
 
   const loadHistory = React.useCallback(async () => {
-    try {
-      setHistoryLoading(true);
+      try {
+        setHistoryLoading(true);
 
-      const userId = localStorage.getItem("userId");
-      if (!userId) {
-        setHistoryItems([]);
-        return;
-      }
+        if (!userId) {
+    setHistoryItems([]);
+    return;
+  }
 
-      const res = await fetch(
-        `/api/mealplans/history?userId=${encodeURIComponent(userId)}`,
-        { cache: "no-store" }
-      );
+  const res = await fetch(
+    `/api/mealplans/history?userId=${encodeURIComponent(userId)}`
+  );
       const data = await res.json();
 
       if (data.ok && Array.isArray(data.history)) {
@@ -174,11 +175,13 @@ export default function HistoryPage() {
     } finally {
       setHistoryLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   React.useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+    if (status === "authenticated" && userId) {
+      loadHistory();
+    }
+  }, [status, userId, loadHistory]);
 
   const openPlanDetails = (item: HistoryItem) => {
     setSelectedPlan(item);
@@ -186,7 +189,6 @@ export default function HistoryPage() {
   };
 
   const restorePlan = async (item: HistoryItem) => {
-    const userId = localStorage.getItem("userId");
 
     if (!userId) {
       showResultModal("Please login first", "You must be logged in.");
@@ -254,7 +256,6 @@ export default function HistoryPage() {
  async function handleClearAllConfirmed() {
   if (typeof window === "undefined") return;
 
-  const userId = localStorage.getItem("userId");
   if (!userId) {
     showResultModal("Please login first", "You must be logged in.");
     return;
@@ -292,6 +293,14 @@ export default function HistoryPage() {
   } finally {
     setClearingAll(false);
   }
+}
+
+if (status === "loading") {
+  return (
+    <div className="min-h-screen px-6 py-8 text-[#023030]">
+      <p className="font-poppins text-sm">Loading history...</p>
+    </div>
+  );
 }
 
   return (

@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSession } from "next-auth/react";
 import {
   ArrowLeft,
   Lightbulb,
@@ -99,8 +100,8 @@ export default function CommunityPage() {
     },
   };
 
-  const userId =
-    typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
+  const { data: session, status } = useSession();
+  const userId = session?.user?.id ?? "";
 
   const loadPosts = React.useCallback(async () => {
     try {
@@ -255,6 +256,20 @@ export default function CommunityPage() {
       toast.error("Failed to update save");
     }
   };
+
+    if (status === "loading") {
+    return (
+      <div className="min-h-screen px-6 py-8 text-[#023030] md:px-10 lg:px-14">
+        <div className="mx-auto max-w-6xl">
+          <div className="rounded-[28px] border border-white/40 bg-white/58 p-6 shadow-[0_10px_28px_rgba(2,48,48,0.06)] backdrop-blur-xl">
+            <p className="font-poppins text-sm font-medium text-[#023030]">
+              Loading community...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -178,15 +179,16 @@ export function ExactSidebar({ active, onChange }: ExactSidebarProps) {
     }
   }, [collapsed]);
 
-  const handleConfirmLogout = () => {
-    localStorage.removeItem("userId");
-    localStorage.removeItem("isLoggedIn");
+  const handleConfirmLogout = async () => {
     localStorage.removeItem("manualMealPlan");
     localStorage.removeItem("currentPlanSource");
     localStorage.removeItem("currentBudget");
     localStorage.removeItem("firstName");
+    localStorage.removeItem("userEmail");
 
-    router.push("/auth/login");
+    setOpenLogoutModal(false);
+
+    await signOut({ redirectTo: "/auth/login" });
   };
 
   const initial = firstName.trim().charAt(0).toUpperCase() || "S";
@@ -343,7 +345,7 @@ export function ExactSidebar({ active, onChange }: ExactSidebarProps) {
                     label="View profile"
                     onClick={() => {
                       setOpenAccountMenu(false);
-                      router.push("/profile");
+                      router.push("/home/profile");
                     }}
                   />
 

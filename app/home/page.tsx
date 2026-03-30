@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import {
   Wallet,
   UtensilsCrossed,
@@ -56,20 +56,10 @@ type WeeklyMealOption = MealOption & {
 
 export default function HomePage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+  const userId = session?.user?.id ?? "";
 
-  useEffect(() => {
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    const userId = localStorage.getItem("userId");
-
-    if (!isLoggedIn || !userId) {
-      router.replace("/auth/login");
-      return;
-    }
-
-    setAuthChecked(true);
-  }, [router]);
-
-  const [authChecked, setAuthChecked] = React.useState(false);
+  // const [authChecked, setAuthChecked] = React.useState(false);
   const [allowanceType, setAllowanceType] =
     React.useState<AllowanceType>("daily");
   const [budget, setBudget] = React.useState<string>("");
@@ -165,12 +155,16 @@ export default function HomePage() {
     return `PHP ${n}`;
   }
 
+  // function isWeeklyOption(option: MealOption | WeeklyMealOption) {
+  //   return (
+  //     allowanceType === "weekly" &&
+  //     Array.isArray((option as WeeklyMealOption).days)
+  //   );
+  // }
+
   function isWeeklyOption(option: MealOption | WeeklyMealOption) {
-    return (
-      allowanceType === "weekly" &&
-      Array.isArray((option as WeeklyMealOption).days)
-    );
-  }
+  return Array.isArray((option as WeeklyMealOption).days);
+}
 
   function getWeeklyDays(option: MealOption | WeeklyMealOption): WeeklyDay[] {
     return Array.isArray((option as WeeklyMealOption).days)
@@ -243,9 +237,9 @@ export default function HomePage() {
   }, []);
 
   React.useEffect(() => {
-    if (!authChecked) return;
+    if (status !== "authenticated") return;
     localStorage.setItem("currentBudget", String(numericBudget || 0));
-  }, [authChecked, numericBudget]);
+  }, [status, numericBudget]);
 
   React.useEffect(() => {
     localStorage.setItem("allowanceType", allowanceType);
@@ -291,7 +285,7 @@ export default function HomePage() {
   };
 
   React.useEffect(() => {
-    if (!authChecked) return;
+    if (status !== "authenticated") return;
 
     const savedPreferenceMode = localStorage.getItem("preferenceMode");
     const savedMealType = localStorage.getItem("mealType");
@@ -330,16 +324,16 @@ export default function HomePage() {
     ) {
       setMealType(savedMealType as MealType);
     }
-  }, [authChecked]);
+  }, [status]);
 
   React.useEffect(() => {
-    if (!authChecked) return;
+    if (status !== "authenticated") return;
 
     async function loadInitialData() {
       try {
         setDataLoading(true);
 
-        const userId = localStorage.getItem("userId");
+        const userId = session?.user?.id ?? "";
 
         const [userRes, mealsRes, estRes, latestPlanRes, historyRes] =
           await Promise.all([
@@ -460,19 +454,54 @@ export default function HomePage() {
     }
 
     loadInitialData();
-  }, [authChecked]);
+}, [status, userId]);
 
-  const resetAll = () => {
-    setOptions([]);
-    setChosenIndex(null);
-    setMealPlan([]);
-    setTotalCost(0);
-    setRemaining(0);
-    setPlanSource(null);
-    localStorage.removeItem("currentPlanSource");
-    sessionStorage.removeItem("selectedWeeklyPlan");
-    sessionStorage.removeItem("selectedWeeklyPreview");
-  };
+React.useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const savedOptions = sessionStorage.getItem("generatedOptions");
+  const savedShowAll = sessionStorage.getItem("showAllGeneratedOptions");
+
+  if (savedOptions) {
+    try {
+      const parsed = JSON.parse(savedOptions);
+
+      if (Array.isArray(parsed)) {
+        setOptions(parsed);
+      }
+    } catch (error) {
+      console.error("Failed to restore generated options:", error);
+    }
+  }
+
+  if (savedShowAll === "true") {
+    setShowAllOptions(true);
+  } else if (savedShowAll === "false") {
+    setShowAllOptions(false);
+  }
+}, []);
+
+React.useEffect(() => {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(
+    "showAllGeneratedOptions",
+    String(showAllOptions)
+  );
+}, [showAllOptions]);
+
+const resetAll = () => {
+  setOptions([]);
+  setChosenIndex(null);
+  setMealPlan([]);
+  setTotalCost(0);
+  setRemaining(0);
+  setPlanSource(null);
+  localStorage.removeItem("currentPlanSource");
+  sessionStorage.removeItem("selectedWeeklyPlan");
+  sessionStorage.removeItem("selectedWeeklyPreview");
+  sessionStorage.removeItem("generatedOptions");
+  sessionStorage.removeItem("showAllGeneratedOptions");
+};
 
   const runGenerateMealPlans = async () => {
     setLoading(true);
@@ -485,7 +514,7 @@ export default function HomePage() {
     const toastId = toast.loading("Generating meal plans...");
 
     try {
-      const userId = localStorage.getItem("userId");
+      const userId = session?.user?.id ?? "";
       if (!userId) {
         toast.error("Please login first", { id: toastId });
         return;
@@ -525,6 +554,8 @@ export default function HomePage() {
       const opts: MealOption[] = data.options || [];
       setOptions(opts);
       setShowAllOptions(false);
+      sessionStorage.setItem("generatedOptions", JSON.stringify(opts));
+      sessionStorage.setItem("showAllGeneratedOptions", "false");
 
       setMealPlan([]);
       setTotalCost(0);
@@ -630,6 +661,8 @@ export default function HomePage() {
     setTotalCost(0);
     setRemaining(numericBudget);
     setPlanSource(null);
+    sessionStorage.removeItem("generatedOptions");
+    sessionStorage.removeItem("showAllGeneratedOptions");
 
     addManualMealToPlan(mealToAdd);
   };
@@ -643,60 +676,59 @@ export default function HomePage() {
   };
 
   const refreshUserMealPlanData = React.useCallback(async () => {
-    const userId = localStorage.getItem("userId");
-    if (!userId) return;
+  if (!userId) return;
 
-    try {
-      const [latestPlanRes, historyRes] = await Promise.all([
-        fetch(`/api/mealplans/latest?userId=${encodeURIComponent(userId)}`),
-        fetch(`/api/mealplans/history?userId=${encodeURIComponent(userId)}`),
-      ]);
+  try {
+    const [latestPlanRes, historyRes] = await Promise.all([
+      fetch(`/api/mealplans/latest?userId=${encodeURIComponent(userId)}`),
+      fetch(`/api/mealplans/history?userId=${encodeURIComponent(userId)}`),
+    ]);
 
-      const latestPlanData = await latestPlanRes.json();
-      const historyData = await historyRes.json();
+    const latestPlanData = await latestPlanRes.json();
+    const historyData = await historyRes.json();
 
-      if (latestPlanData.ok && latestPlanData.mealPlan) {
-        const savedPlan = latestPlanData.mealPlan;
-        const savedMeals = savedPlan.meals ?? [];
+    if (latestPlanData.ok && latestPlanData.mealPlan) {
+      const savedPlan = latestPlanData.mealPlan;
+      const savedMeals = savedPlan.meals ?? [];
 
-        setMealPlan(savedMeals);
-        setTotalCost(savedPlan.totalCost ?? 0);
-        setRemaining(savedPlan.remainingBudget ?? 0);
+      setMealPlan(savedMeals);
+      setTotalCost(savedPlan.totalCost ?? 0);
+      setRemaining(savedPlan.remainingBudget ?? 0);
 
-        if (savedMeals.length > 0) {
-          setPlanSource("generated");
-          localStorage.setItem("currentPlanSource", "generated");
-        } else {
-          setPlanSource(null);
-          localStorage.removeItem("currentPlanSource");
-        }
-
-        if (savedPlan.budget) setBudget(String(savedPlan.budget));
-        if (savedPlan.allowanceType) setAllowanceType(savedPlan.allowanceType);
-        if (savedPlan.mealsPerDay) setMealsPerDay(savedPlan.mealsPerDay);
+      if (savedMeals.length > 0) {
+        setPlanSource("generated");
+        localStorage.setItem("currentPlanSource", "generated");
+      } else {
+        setPlanSource(null);
+        localStorage.removeItem("currentPlanSource");
       }
 
-      if (historyData.ok && Array.isArray(historyData.history)) {
-        const mappedHistory: HistoryItem[] = historyData.history.map(
-          (item: any) => ({
-            id: String(item._id),
-            title: item.label || "Saved Meal Plan",
-            date: new Date(item.createdAt).toLocaleString(),
-            allowanceType: item.allowanceType,
-            budget: item.budget,
-            total: item.totalCost,
-            remaining: item.remainingBudget,
-            meals: (item.meals ?? []).map((meal: any) => meal.mealName),
-            mood: item.label || "Saved",
-          })
-        );
-
-        setHistoryItems(mappedHistory);
-      }
-    } catch (error) {
-      console.error("Failed to refresh meal plan data:", error);
+      if (savedPlan.budget) setBudget(String(savedPlan.budget));
+      if (savedPlan.allowanceType) setAllowanceType(savedPlan.allowanceType);
+      if (savedPlan.mealsPerDay) setMealsPerDay(savedPlan.mealsPerDay);
     }
-  }, []);
+
+    if (historyData.ok && Array.isArray(historyData.history)) {
+      const mappedHistory: HistoryItem[] = historyData.history.map(
+        (item: any) => ({
+          id: String(item._id),
+          title: item.label || "Saved Meal Plan",
+          date: new Date(item.createdAt).toLocaleString(),
+          allowanceType: item.allowanceType,
+          budget: item.budget,
+          total: item.totalCost,
+          remaining: item.remainingBudget,
+          meals: (item.meals ?? []).map((meal: any) => meal.mealName),
+          mood: item.label || "Saved",
+        })
+      );
+
+      setHistoryItems(mappedHistory);
+    }
+  } catch (error) {
+    console.error("Failed to refresh meal plan data:", error);
+  }
+}, [userId]);
 
   const handleChoose = async (index: number) => {
     const option = options[index] as MealOption | WeeklyMealOption;
@@ -708,7 +740,7 @@ export default function HomePage() {
     const toastId = toast.loading("Saving meal plan...");
 
     try {
-      const userId = localStorage.getItem("userId");
+      const userId = session?.user?.id ?? "";
       if (!userId) {
         toast.error("Please login first", { id: toastId });
         return;
@@ -803,7 +835,7 @@ export default function HomePage() {
     }
 
     if (planSource === "generated") {
-      const userId = localStorage.getItem("userId");
+     const userId = session?.user?.id ?? "";
 
       if (!userId) {
         toast.error("Please login first");
@@ -914,7 +946,7 @@ export default function HomePage() {
 
 
 
-  if (!authChecked || dataLoading) {
+  if (status === "loading" || dataLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#dff7ef_0%,#f7fbfb_45%,#eef8f4_100%)] px-6">
         <div className="w-full max-w-sm rounded-[30px] border border-white/60 bg-white/20 p-7 shadow-[0_24px_80px_rgba(2,48,48,0.12)] backdrop-blur-2xl">
@@ -1605,44 +1637,64 @@ export default function HomePage() {
           />
 
           <ConcludeDayModal
-            open={openConcludeDayModal}
-            onOpenChange={setOpenConcludeDayModal}
-            budget={budgetAmount}
-            totalCost={totalCost}
-            remaining={remainingAmount}
-            meals={mealPlan}
-            planLabel={
-              chosenIndex !== null
-                ? options[chosenIndex]?.label || `Option ${chosenIndex + 1}`
-                : "Selected plan"
-            }
-            onDone={async () => {
-              try {
-                const userId = localStorage.getItem("userId");
+  open={openConcludeDayModal}
+  onOpenChange={setOpenConcludeDayModal}
+  budget={budgetAmount}
+  totalCost={totalCost}
+  remaining={remainingAmount}
+  meals={mealPlan}
+  planLabel={
+    chosenIndex !== null
+      ? options[chosenIndex]?.label || `Option ${chosenIndex + 1}`
+      : "Selected plan"
+  }
+  onDone={async () => {
+    try {
+      const userId = session?.user?.id ?? "";
 
-                if (userId) {
-                  const res = await fetch("/api/mealplans/conclude", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ userId }),
-                  });
+      if (userId) {
+        const res = await fetch("/api/mealplans/conclude", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
 
-                  const data = await res.json();
+        const data = await res.json();
 
-                  if (!res.ok) {
-                    toast.error(data.message || "Failed to conclude plan");
-                    return;
-                  }
+        if (!res.ok) {
+          toast.error(data.message || "Failed to conclude plan");
+          return;
+        }
 
-                  toast.success("Day concluded");
-                  await refreshUserMealPlanData();
-                }
-              } catch (error) {
-                console.error(error);
-                toast.error("Failed to conclude day");
-              }
-            }}
-          />
+        // reset current UI state
+        setMealPlan([]);
+        setTotalCost(0);
+        setRemaining(0);
+        setChosenIndex(null);
+        setPlanSource(null);
+        setOptions([]);
+
+        // reset budget input/display
+        setBudget("");
+
+        // clear persisted current-day state
+        localStorage.removeItem("currentBudget");
+        localStorage.removeItem("manualMealPlan");
+        localStorage.removeItem("currentPlanSource");
+        sessionStorage.removeItem("selectedWeeklyPlan");
+        sessionStorage.removeItem("selectedWeeklyPreview");
+
+        setOpenConcludeDayModal(false);
+
+        toast.success("Day concluded");
+        await refreshUserMealPlanData();
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to conclude day");
+    }
+  }}
+/>
 
           <GenerationErrorModal
             open={openGenerationErrorModal}
