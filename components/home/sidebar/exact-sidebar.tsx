@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Store,
@@ -222,10 +223,14 @@ export function ExactSidebar({ active, onChange }: ExactSidebarProps) {
                 collapsed ? "w-full justify-center" : "gap-3"
               }`}
             >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(227,242,253,0.88),rgba(204,255,232,0.92))] text-[#023030] shadow-[0_10px_22px_rgba(255,255,255,0.14)]">
-                <span className="font-poppins text-[22px] font-bold leading-none">
-                  S
-                </span>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center">
+                <Image
+                  src="/sari-logo-yellow.png"
+                  alt="SARI logo"
+                  width={45}
+                  height={45}
+                  className="object-contain"
+                />
               </div>
 
               <AnimatePresence initial={false}>
@@ -235,9 +240,9 @@ export function ExactSidebar({ active, onChange }: ExactSidebarProps) {
                     animate={{ opacity: 1, width: "auto" }}
                     exit={{ opacity: 0, width: 0 }}
                     transition={{ duration: 0.18 }}
-                    className="font-poppins overflow-hidden whitespace-nowrap text-[18px] font-semibold tracking-tight text-white"
+                    className="overflow-hidden whitespace-nowrap text-[20px] font-semibold tracking-tight text-white"
                   >
-                    SARI
+                    sari
                   </motion.p>
                 )}
               </AnimatePresence>
