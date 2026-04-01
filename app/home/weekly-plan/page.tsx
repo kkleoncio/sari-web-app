@@ -89,10 +89,7 @@ export default function WeeklyPlanPage() {
     plan?.days?.reduce((sum, day) => sum + day.meals.length, 0) ?? 0;
 
   const averagePerDay =
-    plan && plan.days.length > 0
-      ? Math.round(plan.totalCost / plan.days.length)
-      : 0;
-
+  plan?.days?.length ? (plan.totalCost / 7).toFixed(2) : "0.00";
   const inferredMealsPerDay = plan?.days?.[0]?.meals?.length ?? 0;
   const inferredBudget =
     plan ? Number(plan.totalCost || 0) + Number(plan.remainingBudget || 0) : 0;
@@ -381,7 +378,7 @@ export default function WeeklyPlanPage() {
               Average per day
             </p>
             <p className="font-poppins mt-1 text-2xl font-semibold text-[#023030]">
-              {formatPeso(averagePerDay)}
+              {formatPeso( Math.floor(plan.totalCost / 7))}
             </p>
           </motion.div>
         </motion.section>

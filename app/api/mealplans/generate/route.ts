@@ -454,7 +454,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    async function generateSingleWeeklyOption(optionIndex: number) {
+    const weeklyOptions: any[] = [];
+
+for (let optionIndex = 0; optionIndex < count; optionIndex++) {
   const days: any[] = [];
   const usedMealIds: string[] = [];
   const usedEstablishments: string[] = [];
@@ -534,11 +536,16 @@ export async function POST(req: NextRequest) {
   }
 
   if (failedDay) {
-    return {
-      ok: false,
-      optionIndex,
-      message: `${failureMessage} Weekly plans work best when the per-day budget is realistic. Try increasing the weekly budget or lowering meals per day.`,
-    };
+    if (optionIndex === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: `${failureMessage} Weekly plans work best when the per-day budget is realistic. Try increasing the weekly budget or lowering meals per day.`,
+        },
+        { status: 400 }
+      );
+    }
+    break;
   }
 
   const totalWeeklyMeals = days.reduce(
@@ -547,61 +554,33 @@ export async function POST(req: NextRequest) {
   );
 
   if (days.length !== 7 || totalWeeklyMeals !== 7 * mealsPerDay) {
-    return {
-      ok: false,
-      optionIndex,
-      message: `Weekly plan validation failed. Expected ${7 * mealsPerDay} meals across 7 days, got ${totalWeeklyMeals}.`,
-    };
-  }
-
-  return {
-    ok: true,
-    optionIndex,
-    option: {
-      allowanceType: "weekly",
-      label: buildWeeklyLabel(optionIndex, preferenceMode),
-      days,
-      totalCost: weeklyTotalCost,
-      remainingBudget: Math.max(0, weeklyRemainingBudget),
-    },
-  };
-}
-
-const weeklyResults = await Promise.allSettled(
-  Array.from({ length: count }, (_, optionIndex) =>
-    generateSingleWeeklyOption(optionIndex)
-  )
-);
-
-const orderedWeeklyOptions: any[] = [];
-let firstFailureMessage = "";
-
-for (const result of weeklyResults) {
-  if (result.status === "fulfilled") {
-    if (result.value.ok) {
-      orderedWeeklyOptions.push(result.value);
-    } else if (!firstFailureMessage && result.value.optionIndex === 0) {
-      firstFailureMessage =
-  result.value.message ??
-  "Failed to generate weekly meal plan.";
+    if (optionIndex === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: `Weekly plan validation failed. Expected ${7 * mealsPerDay} meals across 7 days, got ${totalWeeklyMeals}.`,
+        },
+        { status: 400 }
+      );
     }
-  } else if (!firstFailureMessage) {
-    firstFailureMessage = "Failed to generate weekly meal plans.";
+    break;
   }
+
+  weeklyOptions.push({
+    allowanceType: "weekly",
+    label: buildWeeklyLabel(optionIndex, preferenceMode),
+    days,
+    totalCost: weeklyTotalCost,
+    remainingBudget: Math.max(0, weeklyRemainingBudget),
+  });
 }
-
-orderedWeeklyOptions.sort((a, b) => a.optionIndex - b.optionIndex);
-
-const weeklyOptions = orderedWeeklyOptions.map((item) => item.option);
 
 if (!weeklyOptions.length) {
   const estimatedPerDay = Math.floor(budget / 7);
   return NextResponse.json(
     {
       ok: false,
-      message:
-        firstFailureMessage ||
-        `No weekly meal plan fits PHP ${budget} right now. Your estimated daily budget is about PHP ${estimatedPerDay}. Try increasing your budget or reducing meals per day.`,
+      message: `No weekly meal plan fits PHP ${budget} right now. Your estimated daily budget is about PHP ${estimatedPerDay}. Try increasing your budget or reducing meals per day.`,
     },
     { status: 400 }
   );
@@ -611,12 +590,12 @@ return NextResponse.json({
   ok: true,
   allowanceType: "weekly",
   options: weeklyOptions,
-}); 
-    } catch (error) { 
-      console.error("Error in meal plan generation:", error);
-      return NextResponse.json(
-        { ok: false, message: "An error occurred while generating meal plans." },
-        { status: 500 }
-      );
-    } 
+});
+  } catch (error) {
+    console.error("Error in meal plan generation:", error);
+    return NextResponse.json(
+      { ok: false, message: "An error occurred while generating meal plans." },
+      { status: 500 }
+    );
+  } 
 }
