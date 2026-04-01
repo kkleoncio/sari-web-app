@@ -2,8 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   CalendarDays,
   ChevronLeft,
@@ -14,6 +16,8 @@ import {
   ArrowRight,
   CircleDollarSign,
   CheckCircle2,
+  AlertCircle,
+  Star,
 } from "lucide-react";
 
 type Meal = {
@@ -33,6 +37,7 @@ type WeeklyDay = {
 };
 
 type WeeklyPlan = {
+  allowanceType?: "weekly";
   label?: string;
   totalCost: number;
   remainingBudget: number;
@@ -41,7 +46,11 @@ type WeeklyPlan = {
 
 export default function WeeklyPlanPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+
   const [plan, setPlan] = React.useState<WeeklyPlan | null>(null);
+  const [isPreview, setIsPreview] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
 
   function formatPeso(n: number) {
     return `PHP ${n}`;
@@ -50,21 +59,26 @@ export default function WeeklyPlanPage() {
   React.useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const saved =
-      sessionStorage.getItem("selectedWeeklyPlan") ||
-      sessionStorage.getItem("selectedWeeklyPreview");
+    const selectedPlan = sessionStorage.getItem("selectedWeeklyPlan");
+    const previewPlan = sessionStorage.getItem("selectedWeeklyPreview");
+
+    const saved = selectedPlan || previewPlan;
 
     if (!saved) {
       router.replace("/home");
       return;
     }
 
+    setIsPreview(!selectedPlan && !!previewPlan);
+
     try {
       const parsed = JSON.parse(saved);
+
       if (!parsed?.days || !Array.isArray(parsed.days)) {
         router.replace("/home");
         return;
       }
+
       setPlan(parsed);
     } catch {
       router.replace("/home");
@@ -75,7 +89,13 @@ export default function WeeklyPlanPage() {
     plan?.days?.reduce((sum, day) => sum + day.meals.length, 0) ?? 0;
 
   const averagePerDay =
-    plan && plan.days.length > 0 ? Math.round(plan.totalCost / plan.days.length) : 0;
+    plan && plan.days.length > 0
+      ? Math.round(plan.totalCost / plan.days.length)
+      : 0;
+
+  const inferredMealsPerDay = plan?.days?.[0]?.meals?.length ?? 0;
+  const inferredBudget =
+    plan ? Number(plan.totalCost || 0) + Number(plan.remainingBudget || 0) : 0;
 
   const fadeUp = {
     hidden: { opacity: 0, y: 18 },
@@ -96,6 +116,77 @@ export default function WeeklyPlanPage() {
         staggerChildren: 0.07,
       },
     },
+  };
+
+  const handleChooseWeeklyPlan = async () => {
+    if (!plan) return;
+
+    const userId = session?.user?.id ?? "";
+    if (!userId) {
+      toast.error("Please login first");
+      return;
+    }
+
+    setSaving(true);
+    const toastId = toast.loading("Saving weekly meal plan...");
+
+    try {
+      const selectedOption = {
+        ...plan,
+        allowanceType: "weekly" as const,
+      };
+
+      const res = await fetch("/api/mealplans/choose", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId,
+          allowanceType: "weekly",
+          budget: inferredBudget,
+          mealsPerDay: inferredMealsPerDay,
+          selectedOption,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.message || "Failed to save weekly meal plan", {
+          id: toastId,
+          icon: <AlertCircle className="text-red-500" />,
+        });
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          "selectedWeeklyPlan",
+          JSON.stringify(selectedOption)
+        );
+        sessionStorage.removeItem("selectedWeeklyPreview");
+      }
+
+      setIsPreview(false);
+
+      toast.success("Weekly meal plan saved!", {
+        id: toastId,
+        description: "Your weekly plan is now in history.",
+        icon: <CheckCircle2 className="text-[#046d6d]" />,
+      });
+
+      router.push("/home");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to save weekly meal plan", {
+        id: toastId,
+        description: "Something went wrong. Please try again.",
+        icon: <AlertCircle className="text-red-500" />,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!plan) {
@@ -159,10 +250,26 @@ export default function WeeklyPlanPage() {
           <div className="pointer-events-none absolute bottom-0 left-0 h-32 w-32 rounded-full bg-[#E3F2FD]/55 blur-3xl" />
 
           <div className="relative z-10">
+            
+            <div className="flex items-center justify-between gap-3">
+            {/* LEFT: label pill */}
             <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/55 px-3 py-1.5 text-xs font-medium text-[#025a5a] backdrop-blur-md">
               <CalendarDays className="h-3.5 w-3.5" />
               Weekly meal breakdown
             </div>
+
+            {/* RIGHT: choose button */}
+            {isPreview && (
+              <Button
+                onClick={handleChooseWeeklyPlan}
+                disabled={saving}
+                className="font-poppins rounded-xl bg-[#026d6d] px-4 py-1.5 text-sm text-white shadow-[0_6px_18px_rgba(2,109,109,0.25)] hover:bg-[#025555]"
+              >
+                <Star className="mr-1.5 h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                {saving ? "Saving..." : "Choose this plan"}
+              </Button>
+            )}
+          </div>
 
             <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
@@ -184,6 +291,11 @@ export default function WeeklyPlanPage() {
                   <div className="rounded-full border border-white/40 bg-white/50 px-3 py-1.5 text-xs text-[#023030]/80 backdrop-blur-md">
                     Student-friendly picks
                   </div>
+                  {isPreview && (
+                    <div className="rounded-full border border-white/40 bg-[#E3F2FD] px-3 py-1.5 text-xs text-[#023030]/80 backdrop-blur-md">
+                      Preview mode
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -433,6 +545,16 @@ export default function WeeklyPlanPage() {
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Back to home
               </Button>
+
+              {/* {isPreview && (
+                <Button
+                  onClick={handleChooseWeeklyPlan}
+                  disabled={saving}
+                  className="font-poppins rounded-xl bg-[#026d6d] text-white hover:bg-[#025555]"
+                >
+                  {saving ? "Saving..." : "Choose this plan"}
+                </Button>
+              )} */}
 
               <Button
                 onClick={() => router.push("/home/history")}

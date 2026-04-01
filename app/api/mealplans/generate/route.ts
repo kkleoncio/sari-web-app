@@ -135,6 +135,46 @@ function buildWeeklyLabel(index: number, preferenceMode: string) {
   return index === 0 ? "Best weekly match" : "Another weekly option";
 }
 
+function getMaxReasonableMealPrice(
+  budget: number,
+  mealsPerDay: number,
+  allowanceType: "daily" | "weekly"
+) {
+  const effectiveDailyBudget =
+    allowanceType === "weekly" ? Math.floor(budget / 7) : budget;
+
+  if (mealsPerDay <= 0) return Infinity;
+
+  const perMealBudget = effectiveDailyBudget / mealsPerDay;
+
+  return Math.ceil(perMealBudget * 2.2);
+}
+
+function trimMealsForSolver(
+  meals: any[],
+  budget: number,
+  mealsPerDay: number,
+  allowanceType: "daily" | "weekly"
+) {
+  const maxReasonableMealPrice = getMaxReasonableMealPrice(
+    budget,
+    mealsPerDay,
+    allowanceType
+  );
+
+  const filtered = meals.filter((meal) => {
+    const price = Number(meal.price ?? 0);
+    if (price <= 0) return false;
+    return price <= maxReasonableMealPrice;
+  });
+
+  if (filtered.length < mealsPerDay * 8) {
+    return meals;
+  }
+
+  return filtered;
+}
+
 export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
@@ -143,7 +183,9 @@ export async function POST(req: NextRequest) {
 
     const budget = Number(body.budget);
     const mealsPerDay = Number(body.mealsPerDay);
-    const count = Number(body.count ?? 6);
+
+    const rawCount = Number(body.count ?? 3);
+    const count = Math.min(Math.max(rawCount, 1), 6);
 
     const allowanceType =
       body.allowanceType === "weekly" ? "weekly" : "daily";
@@ -186,21 +228,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("Generate request:", {
-      budget,
-      allowanceType,
-      mealsPerDay,
-      count,
-      preferenceMode,
-      mealType,
-      preferredTags,
-      dislikedTags,
-      excludeAllergens,
-      categoryLimit,
-    });
+    // console.log("Generate request:", {
+    //   budget,
+    //   allowanceType,
+    //   mealsPerDay,
+    //   count,
+    //   preferenceMode,
+    //   mealType,
+    //   preferredTags,
+    //   dislikedTags,
+    //   excludeAllergens,
+    //   categoryLimit,
+    // });
 
     const query: Record<string, unknown> = {
       isAvailable: true,
+      isStandalone: { $ne: false },
     };
 
     if (foodType) {
@@ -215,7 +258,28 @@ export async function POST(req: NextRequest) {
       query.isVegetarian = true;
     }
 
-    let meals = await MealModel.find(query).lean();
+    let meals = await MealModel.find(query)
+      .select(
+        [
+          "_id",
+          "mealName",
+          "foodType",
+          "category",
+          "price",
+          "establishmentName",
+          "establishmentCategory",
+          "location",
+          "mealTime",
+          "healthScore",
+          "isFried",
+          "isSoup",
+          "isVegetarian",
+          "tags",
+          "allergens",
+          "isStandalone",
+        ].join(" ")
+      )
+      .lean();
 
     if (excludeAllergens.length > 0) {
       meals = meals.filter((meal) => {
@@ -248,21 +312,29 @@ export async function POST(req: NextRequest) {
       _id: String(meal._id),
     }));
 
-    console.log("Meals after filtering:", {
-      total: normalizedMeals.length,
-      sample: normalizedMeals.slice(0, 8).map((meal: any) => ({
-        mealName: meal.mealName,
-        price: meal.price,
-        mealTime: meal.mealTime,
-        category: meal.category,
-        foodType: meal.foodType,
-        establishmentName: meal.establishmentName,
-        tags: meal.tags,
-        mealQuality: meal.mealQuality,
-      })),
-    });
+    const solverCandidateMeals = trimMealsForSolver(
+      normalizedMeals,
+      budget,
+      mealsPerDay,
+      allowanceType
+    );
 
-    if (normalizedMeals.length < mealsPerDay) {
+    // console.log("Meals after filtering:", {
+    //   totalBeforeTrim: normalizedMeals.length,
+    //   totalForSolver: solverCandidateMeals.length,
+    //   sample: solverCandidateMeals.slice(0, 8).map((meal: any) => ({
+    //     mealName: meal.mealName,
+    //     price: meal.price,
+    //     mealTime: meal.mealTime,
+    //     category: meal.category,
+    //     foodType: meal.foodType,
+    //     establishmentName: meal.establishmentName,
+    //     tags: meal.tags,
+    //     mealQuality: meal.mealQuality,
+    //   })),
+    // });
+
+    if (solverCandidateMeals.length < mealsPerDay) {
       return NextResponse.json(
         {
           ok: false,
@@ -283,15 +355,24 @@ export async function POST(req: NextRequest) {
     }
 
     const solverBasePayload = {
-      meals: normalizedMeals.map((meal: any) => ({
-        ...meal,
+      meals: solverCandidateMeals.map((meal: any) => ({
         _id: String(meal._id),
+        mealName: String(meal.mealName ?? ""),
+        foodType: String(meal.foodType ?? ""),
+        category: String(meal.category ?? ""),
         price: Math.round(Number(meal.price || 0)),
-        healthScore: Math.round(Number(meal.healthScore || 5)),
+        establishmentName: String(meal.establishmentName ?? ""),
+        establishmentCategory: String(meal.establishmentCategory ?? ""),
+        location: String(meal.location ?? ""),
         mealTime: Array.isArray(meal.mealTime) ? meal.mealTime : [],
+        healthScore: Math.round(Number(meal.healthScore || 5)),
+        isFried: Boolean(meal.isFried),
+        isSoup: Boolean(meal.isSoup),
+        isVegetarian: Boolean(meal.isVegetarian),
         tags: Array.isArray(meal.tags) ? meal.tags : [],
         allergens: Array.isArray(meal.allergens) ? meal.allergens : [],
         mealQuality: meal.mealQuality ?? "light",
+        isStandalone: meal.isStandalone !== false,
       })),
       mealsPerDay,
       count,
@@ -302,7 +383,6 @@ export async function POST(req: NextRequest) {
       categoryLimit,
     };
 
-    // DAILY: keep original behavior
     if (allowanceType === "daily") {
       const solverRes = await fetch(`${process.env.SOLVER_URL}/solve`, {
         method: "POST",
@@ -317,8 +397,8 @@ export async function POST(req: NextRequest) {
 
       const solverData = await solverRes.json();
 
-      console.log("Solver status:", solverRes.status);
-      console.log("Solver response:", solverData);
+      // console.log("Solver status:", solverRes.status);
+      // console.log("Solver response:", solverData);
 
       if (!solverRes.ok || !solverData.ok) {
         return NextResponse.json(
@@ -374,167 +454,169 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // WEEKLY: solve 7 daily plans and combine
-    const weeklyOptions: any[] = [];
+    async function generateSingleWeeklyOption(optionIndex: number) {
+  const days: any[] = [];
+  const usedMealIds: string[] = [];
+  const usedEstablishments: string[] = [];
 
-    for (let optionIndex = 0; optionIndex < count; optionIndex++) {
-      const days: any[] = [];
-      const usedMealIds: string[] = [];
-      const usedEstablishments: string[] = [];
+  let weeklyTotalCost = 0;
+  let weeklyRemainingBudget = budget;
+  let failedDay: string | null = null;
+  let failureMessage = "";
 
-      let weeklyTotalCost = 0;
-      let weeklyRemainingBudget = budget;
-      let failedDay: string | null = null;
-      let failureMessage = "";
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    const dayBudget = buildDayBudget(Math.round(budget), dayIndex);
 
-      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-  const dayBudget = buildDayBudget(Math.round(budget), dayIndex);
-
-  const solverRes = await fetch(`${process.env.SOLVER_URL}/solve`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ...solverBasePayload,
-      budget: dayBudget,
-      count: 1,
-      mealsPerDay,
-      usedMealIds,
-      usedEstablishments,
-    }),
-  });
-
-  const solverData = await solverRes.json();
-
-  if (
-    !solverRes.ok ||
-    !solverData.ok ||
-    !Array.isArray(solverData.options) ||
-    !solverData.options.length
-  ) {
-    failedDay = WEEK_DAYS[dayIndex];
-    failureMessage =
-      solverData?.message ||
-      `No meal plan fits PHP ${dayBudget} for ${failedDay}.`;
-    break;
-  }
-
-  const picked = solverData.options[0];
-  const mealsForDayRaw = Array.isArray(picked.meals) ? picked.meals : [];
-
-  console.log("Weekly day result:", {
-    day: WEEK_DAYS[dayIndex],
-    requestedMealsPerDay: mealsPerDay,
-    returnedMeals: mealsForDayRaw.length,
-    mealNames: mealsForDayRaw.map((meal: any) => meal.mealName),
-  });
-
-  // HARD VALIDATION
-  if (mealsForDayRaw.length !== mealsPerDay) {
-    failedDay = WEEK_DAYS[dayIndex];
-    failureMessage = `Invalid result for ${failedDay}: expected ${mealsPerDay} meals, got ${mealsForDayRaw.length}.`;
-    console.error("Weekly generation validation failed:", {
-      day: WEEK_DAYS[dayIndex],
-      expectedMealsPerDay: mealsPerDay,
-      actualMeals: mealsForDayRaw.length,
-      picked,
+    const solverRes = await fetch(`${process.env.SOLVER_URL}/solve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...solverBasePayload,
+        budget: dayBudget,
+        count: 1,
+        mealsPerDay,
+        usedMealIds,
+        usedEstablishments,
+      }),
     });
-    break;
+
+    const solverData = await solverRes.json();
+
+    if (
+      !solverRes.ok ||
+      !solverData.ok ||
+      !Array.isArray(solverData.options) ||
+      !solverData.options.length
+    ) {
+      failedDay = WEEK_DAYS[dayIndex];
+      failureMessage =
+        solverData?.message ||
+        `No meal plan fits PHP ${dayBudget} for ${failedDay}.`;
+      break;
+    }
+
+    const picked = solverData.options[0];
+    const mealsForDayRaw = Array.isArray(picked.meals) ? picked.meals : [];
+
+    if (mealsForDayRaw.length !== mealsPerDay) {
+      failedDay = WEEK_DAYS[dayIndex];
+      failureMessage = `Invalid result for ${failedDay}: expected ${mealsPerDay} meals, got ${mealsForDayRaw.length}.`;
+      break;
+    }
+
+    const mealsForDay = mealsForDayRaw.slice(0, mealsPerDay);
+
+    const totalCost = mealsForDay.reduce(
+      (sum: number, meal: any) => sum + Number(meal.price ?? 0),
+      0
+    );
+
+    const remainingBudget = Math.max(0, dayBudget - totalCost);
+
+    days.push({
+      day: dayIndex + 1,
+      label: WEEK_DAYS[dayIndex],
+      budget: dayBudget,
+      meals: mealsForDay,
+      totalCost,
+      remainingBudget,
+    });
+
+    weeklyTotalCost += totalCost;
+    weeklyRemainingBudget -= totalCost;
+
+    for (const meal of mealsForDay) {
+      if (meal?._id) usedMealIds.push(String(meal._id));
+      if (meal?.establishmentName) {
+        usedEstablishments.push(String(meal.establishmentName));
+      }
+    }
   }
 
-  const mealsForDay = mealsForDayRaw.slice(0, mealsPerDay);
+  if (failedDay) {
+    return {
+      ok: false,
+      optionIndex,
+      message: `${failureMessage} Weekly plans work best when the per-day budget is realistic. Try increasing the weekly budget or lowering meals per day.`,
+    };
+  }
 
-  const totalCost = mealsForDay.reduce(
-    (sum: number, meal: any) => sum + Number(meal.price ?? 0),
+  const totalWeeklyMeals = days.reduce(
+    (sum, day) => sum + day.meals.length,
     0
   );
 
-  const remainingBudget = Math.max(0, dayBudget - totalCost);
+  if (days.length !== 7 || totalWeeklyMeals !== 7 * mealsPerDay) {
+    return {
+      ok: false,
+      optionIndex,
+      message: `Weekly plan validation failed. Expected ${7 * mealsPerDay} meals across 7 days, got ${totalWeeklyMeals}.`,
+    };
+  }
 
-  days.push({
-    day: dayIndex + 1,
-    label: WEEK_DAYS[dayIndex],
-    budget: dayBudget,
-    meals: mealsForDay,
-    totalCost,
-    remainingBudget,
-  });
+  return {
+    ok: true,
+    optionIndex,
+    option: {
+      allowanceType: "weekly",
+      label: buildWeeklyLabel(optionIndex, preferenceMode),
+      days,
+      totalCost: weeklyTotalCost,
+      remainingBudget: Math.max(0, weeklyRemainingBudget),
+    },
+  };
+}
 
-  weeklyTotalCost += totalCost;
-  weeklyRemainingBudget -= totalCost;
+const weeklyResults = await Promise.allSettled(
+  Array.from({ length: count }, (_, optionIndex) =>
+    generateSingleWeeklyOption(optionIndex)
+  )
+);
 
-  for (const meal of mealsForDay) {
-    if (meal?._id) usedMealIds.push(String(meal._id));
-    if (meal?.establishmentName) {
-      usedEstablishments.push(String(meal.establishmentName));
+const orderedWeeklyOptions: any[] = [];
+let firstFailureMessage = "";
+
+for (const result of weeklyResults) {
+  if (result.status === "fulfilled") {
+    if (result.value.ok) {
+      orderedWeeklyOptions.push(result.value);
+    } else if (!firstFailureMessage && result.value.optionIndex === 0) {
+      firstFailureMessage =
+  result.value.message ??
+  "Failed to generate weekly meal plan.";
     }
+  } else if (!firstFailureMessage) {
+    firstFailureMessage = "Failed to generate weekly meal plans.";
   }
 }
 
-      if (failedDay) {
-        if (optionIndex === 0) {
-          return NextResponse.json(
-            {
-              ok: false,
-              message: `${failureMessage} Weekly plans work best when the per-day budget is realistic. Try increasing the weekly budget or lowering meals per day.`,
-            },
-            { status: 400 }
-          );
-        }
-        break;
-      }
+orderedWeeklyOptions.sort((a, b) => a.optionIndex - b.optionIndex);
 
-      const totalWeeklyMeals = days.reduce(
-        (sum, day) => sum + day.meals.length,
-        0
-      );
+const weeklyOptions = orderedWeeklyOptions.map((item) => item.option);
 
-      if (days.length !== 7 || totalWeeklyMeals !== 7 * mealsPerDay) {
-        if (optionIndex === 0) {
-          return NextResponse.json(
-            {
-              ok: false,
-              message: `Weekly plan validation failed. Expected ${7 * mealsPerDay} meals across 7 days, got ${totalWeeklyMeals}.`,
-            },
-            { status: 400 }
-          );
-        }
-        break;
-      }
+if (!weeklyOptions.length) {
+  const estimatedPerDay = Math.floor(budget / 7);
+  return NextResponse.json(
+    {
+      ok: false,
+      message:
+        firstFailureMessage ||
+        `No weekly meal plan fits PHP ${budget} right now. Your estimated daily budget is about PHP ${estimatedPerDay}. Try increasing your budget or reducing meals per day.`,
+    },
+    { status: 400 }
+  );
+}
 
-      weeklyOptions.push({
-        allowanceType: "weekly",
-        label: buildWeeklyLabel(optionIndex, preferenceMode),
-        days,
-        totalCost: weeklyTotalCost,
-        remainingBudget: Math.max(0, weeklyRemainingBudget),
-      });
-    }
-
-    if (!weeklyOptions.length) {
-      const estimatedPerDay = Math.floor(budget / 7);
+return NextResponse.json({
+  ok: true,
+  allowanceType: "weekly",
+  options: weeklyOptions,
+}); 
+    } catch (error) { 
+      console.error("Error in meal plan generation:", error);
       return NextResponse.json(
-        {
-          ok: false,
-          message: `No weekly meal plan fits PHP ${budget} right now. Your estimated daily budget is about PHP ${estimatedPerDay}. Try increasing your budget or reducing meals per day.`,
-        },
-        { status: 400 }
+        { ok: false, message: "An error occurred while generating meal plans." },
+        { status: 500 }
       );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      allowanceType: "weekly",
-      options: weeklyOptions,
-    });
-  } catch (error) {
-    console.error("POST /api/mealplans/generate error:", error);
-
-    return NextResponse.json(
-      {
-        ok: false,
-        message: "Failed to generate meal plans.",
-      },
-      { status: 500 }
-    );
-  }
+    } 
 }

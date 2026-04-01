@@ -16,6 +16,7 @@ export type Meal = {
   isProcessedMeat?: boolean;
   tags?: string[];
   allergens?: string[];
+  imageUrl?: string;
   mealQuality?: "main" | "light" | "drink";
   dayIndex?: number;
   dayLabel?: string;
@@ -31,6 +32,7 @@ export type Establishment = {
   openingHours: string;
   isOpen: boolean;
   tags: string[];
+  imageUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 };

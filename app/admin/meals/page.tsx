@@ -9,7 +9,6 @@ import {
   Leaf,
   Pencil,
   Plus,
-  ShieldAlert,
   Soup,
   Sparkles,
   Store,
@@ -20,6 +19,7 @@ import {
   XCircle,
   MapPin,
   HeartPulse,
+  ShieldAlert,
 } from "lucide-react";
 
 type Establishment = {
@@ -59,10 +59,62 @@ type MealForm = {
   isFried: boolean;
   isSoup: boolean;
   isVegetarian: boolean;
-  tags: string;
-  allergens: string;
+  tags: string[];
+  allergens: string[];
   isAvailable: boolean;
 };
+
+const FOOD_TYPE_OPTIONS = [
+  { value: "rice_meal", label: "Rice Meal" },
+  { value: "silog", label: "Silog" },
+  { value: "noodles", label: "Noodles" },
+  { value: "pasta", label: "Pasta" },
+  { value: "burger", label: "Burger" },
+  { value: "sandwich", label: "Sandwich" },
+  { value: "snack", label: "Snack" },
+  { value: "drink", label: "Drink" },
+  { value: "dessert", label: "Dessert" },
+  { value: "viand", label: "Viand" },
+  { value: "combo", label: "Combo Meal" },
+  { value: "rice_bowl", label: "Rice Bowl" },
+  { value: "soup", label: "Soup" },
+  { value: "wrap", label: "Wrap" },
+  { value: "sizzler", label: "Sizzler" },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: "main", label: "Main" },
+  { value: "snack", label: "Snack" },
+  { value: "drink", label: "Drink" },
+  { value: "dessert", label: "Dessert" },
+  { value: "side", label: "Side" },
+];
+
+const TAG_OPTIONS = [
+  "budget-friendly",
+  "student-favorite",
+  "heavy-meal",
+  "light-meal",
+  "protein-rich",
+  "vegetarian",
+  "best-seller",
+  "spicy",
+  "sweet",
+  "savory",
+];
+
+const ALLERGEN_OPTIONS = [
+  "egg",
+  "milk",
+  "dairy",
+  "nuts",
+  "peanuts",
+  "soy",
+  "wheat",
+  "gluten",
+  "fish",
+  "shellfish",
+];
 
 const initialForm: MealForm = {
   mealName: "",
@@ -75,10 +127,28 @@ const initialForm: MealForm = {
   isFried: false,
   isSoup: false,
   isVegetarian: false,
-  tags: "",
-  allergens: "",
+  tags: [],
+  allergens: [],
   isAvailable: true,
 };
+
+function formatLabel(value: string) {
+  const specialCases: Record<string, string> = {
+    es_plaza: "ES Plaza",
+    street_food: "Street Food",
+    milk_tea_shop: "Milk Tea Shop",
+    food_stall: "Food Stall",
+    rice_meal: "Rice Meal",
+    rice_bowl: "Rice Bowl",
+  };
+
+  if (specialCases[value]) return specialCases[value];
+
+  return value
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
 export default function AdminMealsPage() {
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -87,6 +157,9 @@ export default function AdminMealsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<MealForm>(initialForm);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
+
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successMode, setSuccessMode] = useState<"create" | "update">("create");
 
   async function fetchMeals() {
     try {
@@ -129,6 +202,15 @@ export default function AdminMealsPage() {
     [meals]
   );
 
+  function toggleArrayValue(field: "tags" | "allergens", value: string) {
+    setForm((prev) => ({
+      ...prev,
+      [field]: prev[field].includes(value)
+        ? prev[field].filter((item) => item !== value)
+        : [...prev[field], value],
+    }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -150,20 +232,14 @@ export default function AdminMealsPage() {
         location: selectedEstablishment.location,
         mealTime: form.mealTime
           .split(",")
-          .map((item) => item.trim())
+          .map((item) => item.trim().toLowerCase())
           .filter(Boolean),
         healthScore: Number(form.healthScore),
         isFried: form.isFried,
         isSoup: form.isSoup,
         isVegetarian: form.isVegetarian,
-        tags: form.tags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-        allergens: form.allergens
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        tags: form.tags,
+        allergens: form.allergens,
         isAvailable: form.isAvailable,
       };
 
@@ -181,18 +257,26 @@ export default function AdminMealsPage() {
         body: JSON.stringify(payload),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
         throw new Error(
-          editingMealId ? "Failed to update meal" : "Failed to create meal"
+          data?.message ||
+            (editingMealId ? "Failed to update meal" : "Failed to create meal")
         );
       }
 
+      const mode = editingMealId ? "update" : "create";
+
       setForm(initialForm);
       setEditingMealId(null);
-      fetchMeals();
-    } catch (error) {
+      await fetchMeals();
+
+      setSuccessMode(mode);
+      setSuccessOpen(true);
+    } catch (error: any) {
       console.error(error);
-      alert("Something went wrong while saving the meal.");
+      alert(error.message || "Something went wrong while saving the meal.");
     } finally {
       setSubmitting(false);
     }
@@ -217,8 +301,8 @@ export default function AdminMealsPage() {
       isFried: meal.isFried,
       isSoup: meal.isSoup,
       isVegetarian: meal.isVegetarian,
-      tags: meal.tags.join(", "),
-      allergens: meal.allergens.join(", "),
+      tags: meal.tags ?? [],
+      allergens: meal.allergens ?? [],
       isAvailable: meal.isAvailable,
     });
 
@@ -257,7 +341,6 @@ export default function AdminMealsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <section className="relative overflow-hidden rounded-[28px] border border-white/60 bg-[linear-gradient(135deg,rgba(10,143,143,0.08),rgba(255,255,255,0.94),rgba(31,92,66,0.08))] p-6 shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
         <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-emerald-100/50 blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 left-0 h-24 w-24 rounded-full bg-teal-100/40 blur-2xl" />
@@ -310,7 +393,6 @@ export default function AdminMealsPage() {
         </div>
       </section>
 
-      {/* Form */}
       <section className="rounded-[28px] border border-slate-200/70 bg-white/90 p-6 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
         <div className="flex flex-col gap-3 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -365,31 +447,38 @@ export default function AdminMealsPage() {
             <label className="text-xs uppercase tracking-[0.15em] text-slate-400 font-helvetica">
               Food Type
             </label>
-            <div className="relative">
-              <Beef className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="e.g. Rice Meal, Snack, Drink"
-                value={form.foodType}
-                onChange={(e) => setForm({ ...form, foodType: e.target.value })}
-                className="w-full rounded-2xl border border-slate-200 bg-[#fbfcfc] py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition focus:border-[#1f5c42]/30 focus:bg-white focus:ring-4 focus:ring-emerald-50 font-helvetica"
-                required
-              />
-            </div>
+            <select
+              value={form.foodType}
+              onChange={(e) => setForm({ ...form, foodType: e.target.value })}
+              className="w-full rounded-2xl border border-slate-200 bg-[#fbfcfc] px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-[#1f5c42]/30 focus:bg-white focus:ring-4 focus:ring-emerald-50 font-helvetica"
+              required
+            >
+              <option value="">Select food type</option>
+              {FOOD_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-2">
             <label className="text-xs uppercase tracking-[0.15em] text-slate-400 font-helvetica">
               Category
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Main Dish"
+            <select
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
               className="w-full rounded-2xl border border-slate-200 bg-[#fbfcfc] px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-[#1f5c42]/30 focus:bg-white focus:ring-4 focus:ring-emerald-50 font-helvetica"
               required
-            />
+            >
+              <option value="">Select category</option>
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-2">
@@ -426,7 +515,7 @@ export default function AdminMealsPage() {
                 <option value="">Select Establishment</option>
                 {establishments.map((est) => (
                   <option key={est._id} value={est._id}>
-                    {est.name} — {est.category}
+                    {est.name} — {formatLabel(est.category)}
                   </option>
                 ))}
               </select>
@@ -439,12 +528,12 @@ export default function AdminMealsPage() {
                 <p className="flex items-center gap-2">
                   <Tag className="h-4 w-4 text-slate-400" />
                   <span className="font-medium text-slate-700">Category:</span>
-                  {selectedEstablishment.category}
+                  {formatLabel(selectedEstablishment.category)}
                 </p>
                 <p className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-slate-400" />
                   <span className="font-medium text-slate-700">Location:</span>
-                  {selectedEstablishment.location}
+                  {formatLabel(selectedEstablishment.location)}
                 </p>
               </div>
             ) : (
@@ -490,38 +579,63 @@ export default function AdminMealsPage() {
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 md:col-span-2">
             <label className="text-xs uppercase tracking-[0.15em] text-slate-400 font-helvetica">
               Tags
             </label>
-            <div className="relative">
-              <Tag className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="budget, student-favorite, heavy meal"
-                value={form.tags}
-                onChange={(e) => setForm({ ...form, tags: e.target.value })}
-                className="w-full rounded-2xl border border-slate-200 bg-[#fbfcfc] py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition focus:border-[#1f5c42]/30 focus:bg-white focus:ring-4 focus:ring-emerald-50 font-helvetica"
-              />
+            <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-[#fbfcfc] p-3">
+              {TAG_OPTIONS.map((tag) => {
+                const checked = form.tags.includes(tag);
+
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleArrayValue("tags", tag)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-helvetica transition ${
+                      checked
+                        ? "border-emerald-200 bg-emerald-50 text-[#1f5c42]"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
             </div>
+            <p className="text-xs text-slate-400 font-helvetica">
+              Select the tags that best describe the meal.
+            </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 md:col-span-2">
             <label className="text-xs uppercase tracking-[0.15em] text-slate-400 font-helvetica">
               Allergens
             </label>
-            <div className="relative">
-              <ShieldAlert className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="nuts, dairy, shellfish"
-                value={form.allergens}
-                onChange={(e) =>
-                  setForm({ ...form, allergens: e.target.value })
-                }
-                className="w-full rounded-2xl border border-slate-200 bg-[#fbfcfc] py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition focus:border-[#1f5c42]/30 focus:bg-white focus:ring-4 focus:ring-emerald-50 font-helvetica"
-              />
+            <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-[#fbfcfc] p-3">
+              {ALLERGEN_OPTIONS.map((allergen) => {
+                const checked = form.allergens.includes(allergen);
+
+                return (
+                  <button
+                    key={allergen}
+                    type="button"
+                    onClick={() => toggleArrayValue("allergens", allergen)}
+                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-helvetica transition ${
+                      checked
+                        ? "border-rose-200 bg-rose-50 text-rose-700"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <ShieldAlert className="h-3.5 w-3.5" />
+                    {allergen}
+                  </button>
+                );
+              })}
             </div>
+            <p className="text-xs text-slate-400 font-helvetica">
+              Mark known allergens so meal filtering works properly.
+            </p>
           </div>
 
           <div className="md:col-span-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -606,7 +720,6 @@ export default function AdminMealsPage() {
         </form>
       </section>
 
-      {/* List */}
       <section className="rounded-[28px] border border-slate-200/70 bg-white/90 p-6 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
         <div className="flex flex-col gap-2 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -718,7 +831,7 @@ export default function AdminMealsPage() {
                         </span>
                       </div>
                       <p className="mt-2 text-sm text-slate-700 font-helvetica">
-                        {meal.foodType}
+                        {formatLabel(meal.foodType)}
                       </p>
                     </div>
 
@@ -730,7 +843,7 @@ export default function AdminMealsPage() {
                         </span>
                       </div>
                       <p className="mt-2 text-sm text-slate-700 font-helvetica">
-                        {meal.category}
+                        {formatLabel(meal.category)}
                       </p>
                     </div>
 
@@ -754,7 +867,7 @@ export default function AdminMealsPage() {
                         </span>
                       </div>
                       <p className="mt-2 text-sm text-slate-700 font-helvetica">
-                        {meal.location}
+                        {formatLabel(meal.location)}
                       </p>
                     </div>
                   </div>
@@ -780,7 +893,7 @@ export default function AdminMealsPage() {
                         key={`${time}-${index}`}
                         className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 font-helvetica"
                       >
-                        {time}
+                        {formatLabel(time)}
                       </span>
                     ))}
                   </div>
@@ -792,7 +905,7 @@ export default function AdminMealsPage() {
                           key={`${tag}-${index}`}
                           className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs text-[#1f5c42] font-helvetica"
                         >
-                          {tag}
+                          {formatLabel(tag)}
                         </span>
                       ))}
                     </div>
@@ -804,7 +917,7 @@ export default function AdminMealsPage() {
                         Allergens
                       </p>
                       <p className="mt-2 text-sm text-rose-700 font-helvetica">
-                        {meal.allergens.join(", ")}
+                        {meal.allergens.map(formatLabel).join(", ")}
                       </p>
                     </div>
                   )}
@@ -814,6 +927,61 @@ export default function AdminMealsPage() {
           )}
         </div>
       </section>
+
+      {successOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#023030]/25 px-4 backdrop-blur-sm"
+          onClick={() => setSuccessOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-md overflow-hidden rounded-[28px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,251,249,0.98)_100%)] p-6 shadow-[0_24px_80px_rgba(2,48,48,0.22)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-emerald-100/70 blur-3xl" />
+            <div className="pointer-events-none absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-teal-100/60 blur-2xl" />
+
+            <div className="relative">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-[linear-gradient(135deg,#dcfce7_0%,#d1fae5_45%,#ccfbf1_100%)] shadow-inner">
+                <CheckCircle2 className="h-8 w-8 text-[#1f5c42]" />
+              </div>
+
+              <div className="mt-5 text-center">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#0d3626]/10 bg-white/80 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-[#1f5c42] shadow-sm font-helvetica">
+                  Success
+                </div>
+
+                <h3 className="mt-4 font-poppins text-2xl font-semibold tracking-[-0.03em] text-[#023030]">
+                  {successMode === "create"
+                    ? "Meal added successfully"
+                    : "Meal updated successfully"}
+                </h3>
+
+                <p className="mt-3 text-sm leading-6 text-slate-600 font-helvetica">
+                  {successMode === "create"
+                    ? "The new meal has been added to your SARI meal database."
+                    : "Your meal changes have been saved successfully."}
+                </p>
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm text-[#1f5c42] font-helvetica">
+                {successMode === "create"
+                  ? "You can add another meal or review it in the list below."
+                  : "The updated meal record is now reflected in your list."}
+              </div>
+
+              <div className="mt-6 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setSuccessOpen(false)}
+                  className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#0a8f8f_0%,#046d6d_45%,#033f3f_90%,#022b2b_100%)] px-6 py-3 text-sm font-medium text-white shadow-[0_12px_26px_rgba(2,48,48,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(2,48,48,0.3)] font-helvetica"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

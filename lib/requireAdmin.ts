@@ -1,57 +1,30 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import jwt from "jsonwebtoken";
-
-type TokenPayload = {
-  userId: string;
-  email: string;
-  role: "user" | "admin";
-};
+import { auth } from "@/auth";
 
 export async function requireAdminPage() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
+  const session = await auth();
 
-  if (!token) {
+  if (!session?.user) {
     redirect("/auth/login");
   }
 
-  try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string
-    ) as TokenPayload;
-
-    if (decoded.role !== "admin") {
-      redirect("/home");
-    }
-
-    return decoded;
-  } catch {
-    redirect("/auth/login");
+  if (session.user.role !== "admin") {
+    redirect("/home");
   }
+
+  return session.user;
 }
 
 export async function requireAdminApi() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
+  const session = await auth();
 
-  if (!token) {
+  if (!session?.user) {
     return { ok: false, status: 401, message: "Unauthorized" };
   }
 
-  try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string
-    ) as TokenPayload;
-
-    if (decoded.role !== "admin") {
-      return { ok: false, status: 403, message: "Forbidden" };
-    }
-
-    return { ok: true, user: decoded };
-  } catch {
-    return { ok: false, status: 401, message: "Invalid token" };
+  if (session.user.role !== "admin") {
+    return { ok: false, status: 403, message: "Forbidden" };
   }
+
+  return { ok: true, user: session.user };
 }

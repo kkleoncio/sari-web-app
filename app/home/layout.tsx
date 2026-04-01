@@ -9,6 +9,8 @@ export default async function HomeLayout({
 }) {
   const session = await auth();
 
+  console.log("🏠 LAYOUT SESSION:", session);
+
   if (!session?.user) {
     redirect("/auth/login");
   }

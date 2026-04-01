@@ -99,6 +99,11 @@ const MealSchema = new Schema(
       type: Boolean,
       default: true,
     },
+    imageUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
   },
   {
     timestamps: true,

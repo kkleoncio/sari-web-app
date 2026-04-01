@@ -16,6 +16,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { GlassSelect } from "@/components/ui/glass-select";
+import Image from "next/image";
+import { EstablishmentItem } from "@/components/home/cards/estab-item";
+import type { EstablishmentCard } from "@/app/home/types";
 
 type Establishment = {
   _id: string;
@@ -26,6 +29,7 @@ type Establishment = {
   openingHours?: string;
   isOpen?: boolean;
   tags?: string[];
+  imageUrl?: string;
 };
 
 type SortOption =
@@ -56,6 +60,8 @@ function parsePriceRange(priceRange: string) {
     max: nums[1] ?? nums[0] ?? Number.POSITIVE_INFINITY,
   };
 }
+
+
 
 export default function AllEstablishmentsPage() {
   const [establishments, setEstablishments] = React.useState<Establishment[]>(
@@ -135,6 +141,8 @@ export default function AllEstablishmentsPage() {
     const filtered = establishments.filter((est) => {
       const searchValue = search.toLowerCase();
 
+      
+
       const matchesSearch =
         est.name.toLowerCase().includes(searchValue) ||
         est.location.toLowerCase().includes(searchValue) ||
@@ -176,6 +184,16 @@ export default function AllEstablishmentsPage() {
     return sorted;
   }, [establishments, search, selectedLocation, selectedCategory, sortBy]);
 
+  const mappedEstablishments: EstablishmentCard[] = filteredAndSortedEstablishments.map((est) => ({
+    id: est._id,
+    name: est.name,
+    location: est.location,
+   openingHours: est.openingHours || "",
+    tags: est.tags ?? [],
+    imageUrl: est.imageUrl || "/default-img.jpg",
+    priceRange: est.priceRange,
+  }));
+
   const hasActiveFilters =
     search.trim() !== "" ||
     selectedLocation !== "all" ||
@@ -189,6 +207,7 @@ export default function AllEstablishmentsPage() {
     setSortBy("name-asc");
   }
 
+  
   return (
     <div
       className="min-h-screen text-[#023030]"
@@ -214,11 +233,6 @@ export default function AllEstablishmentsPage() {
                 <ArrowLeft className="h-4 w-4" />
                 Back to home
               </Link>
-
-              {/* <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/50 bg-[#FBE1AD]/75 px-3.5 py-1.5 text-xs font-medium text-[#025a5a] shadow-sm backdrop-blur-md">
-                <Sparkles className="h-3.5 w-3.5" />
-                Discover food spots around Elbi
-              </div> */}
 
               <h1 className="font-poppins mt-4 text-3xl font-semibold tracking-[-0.02em] text-[#023030] md:text-4xl">
                 Browse all establishments
@@ -363,86 +377,16 @@ export default function AllEstablishmentsPage() {
           </div>
         ) : (
           <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {filteredAndSortedEstablishments.map((est, index) => (
-              <motion.article
-                key={est._id}
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.03 }}
-                className="group relative overflow-hidden rounded-[30px] border border-white/50 bg-white/52 p-5 shadow-[0_12px_34px_rgba(2,48,48,0.07)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_46px_rgba(2,48,48,0.12)]"
-              >
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.42),rgba(255,255,255,0.08))]" />
-
-                <div className="relative">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="font-poppins truncate text-xl font-semibold tracking-[-0.01em] text-[#023030]">
-                        {est.name}
-                      </h2>
-
-                      <div className="mt-1.5 flex items-center gap-1.5 text-sm text-[#023030]/62">
-                        <MapPin className="h-3.5 w-3.5 shrink-0 text-[#026d6d]" />
-                        <span className="truncate">
-                          {formatLabel(est.location)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 rounded-full border border-white/50 bg-[#EAF6F6]/88 px-3 py-1.5 text-[11px] font-medium text-[#025a5a] backdrop-blur-md">
-                      {formatLabel(est.category)}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-[#f7fcfc] px-3 py-2 ring-1 ring-[#023030]/6">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E6F4F1] text-[#026d6d]">
-                        <PhilippinePeso className="h-4 w-4" />
-                      </span>
-                      <span className="text-sm font-medium text-[#023030]">
-                        {est.priceRange}
-                      </span>
-                    </div>
-
-                    <div className="inline-flex items-center gap-2 rounded-full bg-[#f7fcfc] px-3 py-2 ring-1 ring-[#023030]/6">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E6F1F7] text-[#026d6d]">
-                        <Clock3 className="h-4 w-4" />
-                      </span>
-                      <span
-                        className={`text-sm font-medium ${
-                          est.openingHours
-                            ? "text-[#023030]"
-                            : "italic text-[#023030]/42"
-                        }`}
-                      >
-                        {est.openingHours || "Hours not available"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {!!est.tags?.length && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {est.tags.slice(0, 4).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full border border-white/50 bg-white/72 px-3 py-1 text-xs font-medium text-[#023030]/74 backdrop-blur-md"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mt-5">
-                    <Link
-                      href={`/home/establishments/${est._id}`}
-                      className="font-poppins inline-flex w-full items-center justify-center rounded-2xl bg-[#023030] px-4 py-3 text-sm font-medium text-white transition duration-200 hover:bg-[#034646]"
-                    >
-                      View establishment
-                    </Link>
-                  </div>
-                </div>
-              </motion.article>
-            ))}
+            {mappedEstablishments.map((item, index) => (
+  <motion.div
+    key={item.id}
+    initial={{ opacity: 0, y: 18 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: index * 0.03 }}
+  >
+    <EstablishmentItem item={item} />
+  </motion.div>
+))}
           </div>
         )}
       </div>

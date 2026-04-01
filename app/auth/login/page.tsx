@@ -18,32 +18,39 @@ export default function LoginPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsSubmitting(true);
+  e.preventDefault();
+  setError("");
+  setIsSubmitting(true);
 
-    try {
-      const result = await signIn("credentials", {
-        email: form.email,
-        password: form.password,
-        redirect: false,
-        redirectTo: "/home",
-      });
+  try {
+    const result = await signIn("credentials", {
+      email: form.email,
+      password: form.password,
+      redirect: false,
+    });
 
-      if (result?.error) {
-        setError("Invalid email or password.");
-        return;
-      }
-
-      router.push("/home");
-      router.refresh();
-    } catch (err) {
-      console.error("LOGIN ERROR:", err);
-      setError("Network error. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+    if (result?.error) {
+      setError("Invalid email or password.");
+      return;
     }
-  };
+
+    const sessionRes = await fetch("/api/auth/session");
+    const session = await sessionRes.json();
+
+    if (session?.user?.role === "admin") {
+      router.push("/admin");
+    } else {
+      router.push("/home");
+    }
+
+    router.refresh();
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+    setError("Network error. Please try again.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleGoogleSignIn = async () => {
     await signIn("google", { redirectTo: "/home" });

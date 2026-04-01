@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import * as React from "react";
 import { Clock3, MapPin, Leaf, ChevronRight } from "lucide-react";
 import type { EstablishmentCard } from "@/app/home/types";
 import { HoverTooltip } from "@/components/ui/hover-tooltip";
-
 
 type EstablishmentItemProps = {
   item: EstablishmentCard & {
@@ -48,17 +48,9 @@ export function EstablishmentItem({
   item,
   onViewMeals,
 }: EstablishmentItemProps) {
-
-  const imageMap: Record<string, string> = {
-    "Aldrin's Kitchen": "/estab-imgs/aldrins.jpg",
-    "Bites All Day": "/estab-imgs/bites-all-day.jpg",
-    "Black and Brew": "/estab-imgs/black-and-brew.jpg",
-    "Chadiz Pizza": "/estab-imgs/chadis-pizza.jpg",
-    "Chikin Corner": "/estab-imgs/chikin-corner.jpg",
-    "Chubby Habbi's": "/estab-imgs/chubby-habbis.jpg",
-  };
-
-  const imageSrc = imageMap[item.name] || "/default-img.jpg";
+  const [imageSrc, setImageSrc] = React.useState(
+    item.imageUrl || "/default-img.jpg"
+  );
 
   const displayLocation = formatLocation(item.location);
   const healthScore = item.healthScore ?? 5;
@@ -73,6 +65,7 @@ export function EstablishmentItem({
           alt={item.name}
           fill
           className="object-cover transition duration-500 group-hover:scale-[1.05]"
+          onError={() => setImageSrc("/default-img.jpg")}
         />
 
         <div className="absolute inset-0 bg-gradient-to-t from-[#023030]/55 via-[#023030]/14 to-transparent" />
@@ -134,7 +127,7 @@ export function EstablishmentItem({
                   <Clock3 className="h-3.5 w-3.5" />
                 </span>
                 <span className="font-medium text-[#023030]">
-                  {item.openingHours || "10:00 AM – 8:00 PM"}  
+                  {item.openingHours || "10:00 AM – 8:00 PM"}
                 </span>
               </div>
             </div>

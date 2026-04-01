@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     const body = await req.json();
+    console.log("POST /api/admin/establishments body:", body);
 
     const newEstablishment = await Establishment.create({
       name: body.name,
@@ -55,11 +56,16 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(newEstablishment, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("POST establishment error:", error);
+    console.error("POST establishment error message:", error?.message);
+    console.error("POST establishment error errors:", error?.errors);
 
     return NextResponse.json(
-      { message: "Failed to create establishment" },
+      {
+        message: error?.message || "Failed to create establishment",
+        errors: error?.errors || null,
+      },
       { status: 500 }
     );
   }

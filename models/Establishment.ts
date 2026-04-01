@@ -11,7 +11,15 @@ const EstablishmentSchema = new Schema(
       type: String,
       required: true,
       trim: true,
-      enum: ["Carinderia", "Cafeteria", "Restaurant", "Food Stall", "Bakery", "Milk Tea Shop", "Snack House"],
+      enum: [
+      "carinderia",
+      "cafeteria",
+      "restaurant",
+      "food_stall",
+      "bakery",
+      "milk_tea_shop",
+      "snack_house",
+    ],
     },
     location: {
       type: String,
@@ -35,6 +43,10 @@ const EstablishmentSchema = new Schema(
     tags: {
       type: [String],
       default: [],
+    },
+    imageUrl: {
+      type: String,
+      default: "",
     },
   },
   {

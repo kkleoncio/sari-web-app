@@ -1,9 +1,21 @@
 import { Users, Store, UtensilsCrossed, ArrowUpRight, Sparkles } from "lucide-react";
+import connectToDatabase from "@/lib/db";
+import User from "@/models/User";
+import Establishment from "@/models/Establishment";
+import Meal from "@/models/Meal";
+import Link from "next/link";
 
-export default function AdminPage() {
+export default async function AdminPage() {
+  await connectToDatabase();
+
+  const [totalUsers, totalEstablishments, totalMeals] = await Promise.all([
+    User.countDocuments(),
+    Establishment.countDocuments(),
+    Meal.countDocuments(),
+  ]);
+
   return (
     <div className="space-y-8">
-      {/* Header / Hero */}
       <section className="relative overflow-hidden rounded-[28px] border border-white/50 bg-[linear-gradient(135deg,rgba(10,143,143,0.08),rgba(255,255,255,0.9),rgba(31,92,66,0.08))] p-7 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
         <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-emerald-200/30 blur-3xl" />
         <div className="pointer-events-none absolute -left-10 bottom-0 h-32 w-32 rounded-full bg-teal-100/40 blur-2xl" />
@@ -27,81 +39,86 @@ export default function AdminPage() {
         </div>
       </section>
 
-      {/* Stats */}
       <section className="grid gap-4 md:grid-cols-3">
-        <div className="group rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)]">
-          <div className="flex items-start justify-between">
-            <div className="rounded-2xl bg-emerald-50 p-3 text-[#1f5c42]">
-              <Users className="h-5 w-5" />
-            </div>
+  <Link
+    href="/admin/users"
+    className="group rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-4 focus:ring-emerald-100"
+  >
+    <div className="flex items-start justify-between">
+      <div className="rounded-2xl bg-emerald-50 p-3 text-[#1f5c42]">
+        <Users className="h-5 w-5" />
+      </div>
 
-            <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] text-[#1f5c42] font-helvetica">
-              +0%
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </div>
-          </div>
+      <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] text-[#1f5c42] font-helvetica">
+        View
+        <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </div>
+    </div>
 
-          <div className="mt-6">
-            <p className="text-sm text-slate-500 font-helvetica">Total Users</p>
-            <h3 className="mt-2 font-poppins text-3xl font-semibold tracking-[-0.03em] text-[#023030]">
-              --
-            </h3>
-            <p className="mt-2 text-xs text-slate-400 font-helvetica">
-              Registered users in the system
-            </p>
-          </div>
-        </div>
+    <div className="mt-6">
+      <p className="text-sm text-slate-500 font-helvetica">Total Users</p>
+      <h3 className="mt-2 font-poppins text-3xl font-semibold tracking-[-0.03em] text-[#023030]">
+        {totalUsers}
+      </h3>
+      <p className="mt-2 text-xs text-slate-400 font-helvetica">
+        Registered users in the system
+      </p>
+    </div>
+  </Link>
 
-        <div className="group rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)]">
-          <div className="flex items-start justify-between">
-            <div className="rounded-2xl bg-teal-50 p-3 text-[#0a6c6c]">
-              <Store className="h-5 w-5" />
-            </div>
+  <Link
+    href="/admin/establishments"
+    className="group rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-4 focus:ring-teal-100"
+  >
+    <div className="flex items-start justify-between">
+      <div className="rounded-2xl bg-teal-50 p-3 text-[#0a6c6c]">
+        <Store className="h-5 w-5" />
+      </div>
 
-            <div className="flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] text-[#0a6c6c] font-helvetica">
-              +0%
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </div>
-          </div>
+      <div className="flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] text-[#0a6c6c] font-helvetica">
+        View
+        <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </div>
+    </div>
 
-          <div className="mt-6">
-            <p className="text-sm text-slate-500 font-helvetica">
-              Establishments
-            </p>
-            <h3 className="mt-2 font-poppins text-3xl font-semibold tracking-[-0.03em] text-[#023030]">
-              --
-            </h3>
-            <p className="mt-2 text-xs text-slate-400 font-helvetica">
-              Food spots currently managed by admin
-            </p>
-          </div>
-        </div>
+    <div className="mt-6">
+      <p className="text-sm text-slate-500 font-helvetica">Establishments</p>
+      <h3 className="mt-2 font-poppins text-3xl font-semibold tracking-[-0.03em] text-[#023030]">
+        {totalEstablishments}
+      </h3>
+      <p className="mt-2 text-xs text-slate-400 font-helvetica">
+        Food spots currently managed by admin
+      </p>
+    </div>
+  </Link>
 
-        <div className="group rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)]">
-          <div className="flex items-start justify-between">
-            <div className="rounded-2xl bg-amber-50 p-3 text-amber-600">
-              <UtensilsCrossed className="h-5 w-5" />
-            </div>
+  <Link
+    href="/admin/meals"
+    className="group rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-1 hover:border-amber-200 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-4 focus:ring-amber-100"
+  >
+    <div className="flex items-start justify-between">
+      <div className="rounded-2xl bg-amber-50 p-3 text-amber-600">
+        <UtensilsCrossed className="h-5 w-5" />
+      </div>
 
-            <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] text-amber-600 font-helvetica">
-              +0%
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </div>
-          </div>
+      <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] text-amber-600 font-helvetica">
+        View
+        <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </div>
+    </div>
 
-          <div className="mt-6">
-            <p className="text-sm text-slate-500 font-helvetica">Meals</p>
-            <h3 className="mt-2 font-poppins text-3xl font-semibold tracking-[-0.03em] text-[#023030]">
-              --
-            </h3>
-            <p className="mt-2 text-xs text-slate-400 font-helvetica">
-              Available meal entries in SARI
-            </p>
-          </div>
-        </div>
-      </section>
+    <div className="mt-6">
+      <p className="text-sm text-slate-500 font-helvetica">Meals</p>
+      <h3 className="mt-2 font-poppins text-3xl font-semibold tracking-[-0.03em] text-[#023030]">
+        {totalMeals}
+      </h3>
+      <p className="mt-2 text-xs text-slate-400 font-helvetica">
+        Available meal entries in SARI
+      </p>
+    </div>
+  </Link>
+</section>
 
-      {/* Lower cards */}
       <section className="grid gap-4 lg:grid-cols-[1.35fr_0.9fr]">
         <div className="rounded-[26px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
           <div className="flex items-center justify-between">

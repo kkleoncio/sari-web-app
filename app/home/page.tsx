@@ -39,6 +39,7 @@ import { GenerationErrorModal } from "@/components/home/modals/generation-error-
 import { ConcludeDayModal } from "@/components/home/modals/conclude-day-modal";
 import { ReplaceManualPlanModal } from "@/components/home/modals/replace-manual-plan-modal";
 import { ReplaceGeneratedPlanModal } from "@/components/home/modals/replace-generated-plan-modal";
+import { useState } from "react";
 
 type WeeklyDay = {
   day: number;
@@ -95,6 +96,7 @@ export default function HomePage() {
   const [dislikedTags, setDislikedTags] = React.useState<string[]>([]);
 
   const [activeNav, setActiveNav] = React.useState<NavKey>("dashboard");
+  const [loadingMore, setLoadingMore] = useState(false);
 
   React.useEffect(() => {
     function syncManualMealPlan() {
@@ -194,6 +196,8 @@ export default function HomePage() {
     ];
 
     const visibleSections = new Map<NavKey, number>();
+
+    
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -377,7 +381,7 @@ export default function HomePage() {
               location: est.location,
               openingHours: est.openingHours,
               tags: est.tags ?? [],
-              imageUrl: "/default-img.jpg",
+              imageUrl: est.imageUrl || "/default-img.jpg",
               priceRange: est.priceRange ?? "",
             }));
 
@@ -527,7 +531,7 @@ const resetAll = () => {
         budget: numericBudget,
         allowanceType,
         mealsPerDay,
-        count: 6,
+        count: 3,
         preferenceMode,
         mealType,
         preferredTags,
@@ -980,6 +984,45 @@ const resetAll = () => {
 
   const visibleMeals = meals.slice(0, 6);
   const visibleEstablishments = establishments.slice(0, 6);
+
+  const handleGenerateMore = async () => {
+    try {
+      setLoadingMore(true);
+
+      const res = await fetch("/api/mealplans/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          budget: budgetAmount,
+          mealsPerDay,
+          allowanceType,
+          preferenceMode,
+          mealType,
+          preferredTags,
+          dislikedTags,
+          excludeAllergens,
+          categoryLimit:3,
+          count: 6, 
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        setOptions(data.options); // replace current options
+        setChosenIndex(null); // reset selected option
+         setShowAllOptions(true);
+      } else {
+        console.error(data.message);
+      }
+    } catch (error) {
+      console.error("Generate more failed:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   
   return (
@@ -1456,6 +1499,7 @@ const resetAll = () => {
                         </motion.div>
                       );
                     })}
+                    
                   </div>
                 ) : (
                   <div className="rounded-[26px] border border-white/35 bg-[linear-gradient(135deg,rgba(255,255,255,0.52),rgba(227,242,253,0.36),rgba(204,255,232,0.24))] p-5 backdrop-blur-xl">
@@ -1475,17 +1519,39 @@ const resetAll = () => {
                 )}
               </div>
 
-              {options.length > 3 && (
-                <div className="mt-5 flex justify-center">
+              {options.length > 0 && (
+                <div className="mt-5 flex items-center justify-end gap-3">
+                  {options.length > 3 ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowAllOptions((prev) => !prev)}
+                      className="font-poppins rounded-xl border-white/45 bg-white/55 text-[#023030] backdrop-blur-md hover:bg-white/75"
+                    >
+                      {showAllOptions ? "Show less" : `View all ${options.length} options`}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      disabled
+                      className="font-poppins rounded-xl border-white/35 bg-white/45 text-[#023030]/55 backdrop-blur-md cursor-default"
+                    >
+                      Showing {options.length} options
+                    </Button>
+                  )}
+
+                  {/* ✅ NEW BUTTON */}
                   <Button
-                    variant="outline"
-                    onClick={() => setShowAllOptions((prev) => !prev)}
-                    className="font-poppins rounded-xl border-white/45 bg-white/55 text-[#023030] backdrop-blur-md hover:bg-white/75"
+                    onClick={handleGenerateMore}
+                    disabled={loadingMore}
+                    className="font-poppins rounded-xl bg-[linear-gradient(135deg,#022b2b_0%,#033f3f_45%,#046d6d_90%,#0a8f8f_100%)] px-5 text-white  hover:opacity-95"
+
                   >
-                    {showAllOptions ? "Show less" : `View all ${options.length} options`}
+                    {loadingMore ? "Generating..." : "✨ Generate More Options"}
                   </Button>
+
                 </div>
               )}
+
             </motion.section>
 
             <EstablishmentsSection
