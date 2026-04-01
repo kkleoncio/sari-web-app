@@ -39,9 +39,33 @@ class SolveMealPlansRequest(BaseModel):
     excludeAllergens: List[str] = []
     categoryLimit: int = 3
 
-    # Added for simple weekly support via repeated daily solves
     usedMealIds: List[str] = []
     usedEstablishments: List[str] = []
+
+
+WEEK_DAYS = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+]
+
+
+def build_day_budget(total_budget: int, day_index: int) -> int:
+    base = total_budget // 7
+    remainder = total_budget % 7
+    return base + (1 if day_index < remainder else 0)
+
+
+def build_weekly_label(index: int, preference_mode: str) -> str:
+    if preference_mode == "cheapest":
+        return "Best weekly budget pick" if index == 0 else "Another weekly option"
+    if preference_mode == "variety":
+        return "Most varied weekly plan" if index == 0 else "Another weekly option"
+    return "Best weekly match" if index == 0 else "Another weekly option"
 
 
 def get_meal_slots(meals_per_day: int) -> List[str]:
@@ -56,45 +80,29 @@ def get_meal_slots(meals_per_day: int) -> List[str]:
     return ["breakfast", "lunch", "dinner"]
 
 
-def normalize_tags(meal: Meal) -> set[str]:
-    return {tag.lower() for tag in meal.tags}
+def label_option(index: int, preference_mode: str) -> str:
+    if preference_mode == "cheapest":
+        labels = ["Best budget pick", "Cheapest alternative", "More budget left"]
+    elif preference_mode == "variety":
+        labels = ["Most variety", "Different picks", "Another varied option"]
+    else:
+        labels = ["Best match", "Balanced alternative", "Suggested option"]
+
+    if index < len(labels):
+        return labels[index]
+    return "Suggested option"
 
 
-def has_tag(meal: Meal, value: str) -> bool:
-    return value.lower() in normalize_tags(meal)
-
-
-def has_excluded_allergen(meal: Meal, exclude_allergens: List[str]) -> bool:
-    if not exclude_allergens:
-        return False
-    meal_allergens = {a.lower() for a in meal.allergens}
-    blocked = {a.lower() for a in exclude_allergens}
-    return len(meal_allergens.intersection(blocked)) > 0
-
-
-def is_main(meal: Meal) -> bool:
-    return meal.mealQuality == "main"
-
-
-def is_light(meal: Meal) -> bool:
-    return meal.mealQuality == "light"
-
-
-def compute_preference_score(
+def compute_preference_score_precomputed(
     meal: Meal,
+    meal_tags: set[str],
     preference_mode: str,
-    preferred_tags: List[str],
-    disliked_tags: List[str],
-    used_meal_ids: List[str],
-    used_establishments: List[str],
+    preferred: set[str],
+    disliked: set[str],
+    used_meal_ids_set: set[str],
+    used_establishments_set: set[str],
 ) -> int:
     score = 0
-
-    meal_tags = normalize_tags(meal)
-    preferred = {tag.lower() for tag in preferred_tags}
-    disliked = {tag.lower() for tag in disliked_tags}
-    used_meal_ids_set = {value.lower() for value in used_meal_ids}
-    used_establishments_set = {value.lower() for value in used_establishments}
 
     score += 3 * len(meal_tags.intersection(preferred))
     score -= 3 * len(meal_tags.intersection(disliked))
@@ -121,7 +129,6 @@ def compute_preference_score(
         if meal.isFried:
             score -= 2
 
-    # Simple weekly anti-repeat scoring
     if meal.id.lower() in used_meal_ids_set:
         score -= 20
 
@@ -131,33 +138,143 @@ def compute_preference_score(
     return score
 
 
-def label_option(index: int, preference_mode: str) -> str:
-    if preference_mode == "cheapest":
-        labels = ["Best budget pick", "Cheapest alternative", "More budget left"]
-    elif preference_mode == "variety":
-        labels = ["Most variety", "Different picks", "Another varied option"]
-    else:
-        labels = ["Best match", "Balanced alternative", "Suggested option"]
-
-    if index < len(labels):
-        return labels[index]
-    return "Suggested option"
-
-
-@app.get("/health")
-def health():
-    return {"ok": True}
-
-
-@app.post("/solve")
-def solve_meal_plans(req: SolveMealPlansRequest):
-    print("SOLVER RECEIVED mealsPerDay:", req.mealsPerDay)
+def solve_daily_options(req: SolveMealPlansRequest) -> dict:
     meals = [meal for meal in req.meals if meal.isStandalone is not False]
     slots = get_meal_slots(req.mealsPerDay)
-    print("SOLVER SLOTS:", slots)
 
     if not meals:
         return {"ok": False, "message": "No meals provided."}
+
+    preferred_set = {tag.lower() for tag in req.preferredTags}
+    disliked_set = {tag.lower() for tag in req.dislikedTags}
+    blocked_allergens = {a.lower() for a in req.excludeAllergens}
+    used_meal_ids_set = {value.lower() for value in req.usedMealIds}
+    used_establishments_set = {value.lower() for value in req.usedEstablishments}
+
+    normalized_tags_by_index: List[set[str]] = []
+    normalized_allergens_by_index: List[set[str]] = []
+    normalized_meal_times_by_index: List[set[str]] = []
+    meal_scores_by_index: List[int] = []
+
+    main_indices: List[int] = []
+    light_indices: List[int] = []
+
+    categories_map: dict[str, List[int]] = {}
+    establishments_map: dict[str, List[int]] = {}
+
+    family_limits = {
+        "siomai": 1,
+        "shanghai": 1,
+        "sharksfin": 1,
+        "wings": 1,
+        "burger": 1,
+        "pasta": 1,
+        "sisig": 1,
+        "inasal": 1,
+        "bulgogi": 1,
+    }
+
+    protein_limits = {
+        "chicken": 2,
+        "pork": 2,
+        "beef": 2,
+        "fish": 2,
+        "tuna": 2,
+        "spam": 1,
+        "sausage": 1,
+        "longganisa": 1,
+        "hotdog": 1,
+    }
+
+    family_indices_map: dict[str, List[int]] = {family: [] for family in family_limits}
+    protein_indices_map: dict[str, List[int]] = {protein: [] for protein in protein_limits}
+
+    for m_idx, meal in enumerate(meals):
+        tags_set = {tag.lower() for tag in meal.tags}
+        allergens_set = {a.lower() for a in meal.allergens}
+        meal_times_set = {m.lower() for m in meal.mealTime} if meal.mealTime else set()
+
+        normalized_tags_by_index.append(tags_set)
+        normalized_allergens_by_index.append(allergens_set)
+        normalized_meal_times_by_index.append(meal_times_set)
+
+        meal_score = compute_preference_score_precomputed(
+            meal=meal,
+            meal_tags=tags_set,
+            preference_mode=req.preferenceMode,
+            preferred=preferred_set,
+            disliked=disliked_set,
+            used_meal_ids_set=used_meal_ids_set,
+            used_establishments_set=used_establishments_set,
+        )
+        meal_scores_by_index.append(meal_score)
+
+        if meal.mealQuality == "main":
+            main_indices.append(m_idx)
+        if meal.mealQuality == "light":
+            light_indices.append(m_idx)
+
+        if meal.category:
+            categories_map.setdefault(meal.category, []).append(m_idx)
+
+        if meal.establishmentName:
+            establishments_map.setdefault(meal.establishmentName, []).append(m_idx)
+
+        for family in family_limits:
+            if family in tags_set:
+                family_indices_map[family].append(m_idx)
+
+        for protein in protein_limits:
+            if protein in tags_set:
+                protein_indices_map[protein].append(m_idx)
+
+    exact_allowed_by_slot: List[List[int]] = []
+    fallback_allowed_by_slot: List[List[int]] = []
+
+    for slot in slots:
+        exact_matches: List[int] = []
+        fallback_matches: List[int] = []
+
+        for m_idx, meal in enumerate(meals):
+            if blocked_allergens and normalized_allergens_by_index[m_idx].intersection(blocked_allergens):
+                continue
+
+            meal_times = normalized_meal_times_by_index[m_idx]
+
+            if not meal.mealTime or slot.lower() in meal_times:
+                exact_matches.append(m_idx)
+                continue
+
+            category = (meal.category or "").lower()
+            food_type = (meal.foodType or "").lower()
+            tags = normalized_tags_by_index[m_idx]
+
+            if slot == "breakfast":
+                if (
+                    "breakfast" in category
+                    or "meal" in category
+                    or "rice" in category
+                    or "silog" in food_type
+                    or "breakfast" in food_type
+                    or "filling" in tags
+                    or "rice meal" in tags
+                    or meal.mealQuality == "main"
+                ):
+                    fallback_matches.append(m_idx)
+                    continue
+
+            if slot == "snack":
+                if meal.mealQuality == "light":
+                    fallback_matches.append(m_idx)
+                    continue
+
+            if slot in ["lunch", "dinner"]:
+                if meal.mealQuality == "main":
+                    fallback_matches.append(m_idx)
+                    continue
+
+        exact_allowed_by_slot.append(exact_matches)
+        fallback_allowed_by_slot.append(fallback_matches)
 
     solutions = []
     excluded_solution_keys: List[List[str]] = []
@@ -166,75 +283,34 @@ def solve_meal_plans(req: SolveMealPlansRequest):
         model = cp_model.CpModel()
 
         x = {}
-        for s_idx, slot in enumerate(slots):
-            for m_idx, meal in enumerate(meals):
+        for s_idx, _slot in enumerate(slots):
+            for m_idx, _meal in enumerate(meals):
                 x[(s_idx, m_idx)] = model.NewBoolVar(f"x_{s_idx}_{m_idx}")
 
-        # 1) Exactly one meal per slot
         for s_idx, slot in enumerate(slots):
-            exact_matches = []
-            fallback_matches = []
+            exact_matches = exact_allowed_by_slot[s_idx]
+            fallback_matches = fallback_allowed_by_slot[s_idx]
 
-            for m_idx, meal in enumerate(meals):
-                if has_excluded_allergen(meal, req.excludeAllergens):
-                    model.Add(x[(s_idx, m_idx)] == 0)
-                    continue
+            allowed_indices = exact_matches if exact_matches else fallback_matches
+            blocked_indices = fallback_matches if exact_matches else []
 
-                normalized_meal_times = (
-                    [m.lower() for m in meal.mealTime] if meal.mealTime else []
-                )
-
-                if not meal.mealTime or slot.lower() in normalized_meal_times:
-                    exact_matches.append(x[(s_idx, m_idx)])
-                    continue
-
-                category = (meal.category or "").lower()
-                food_type = (meal.foodType or "").lower()
-                tags = normalize_tags(meal)
-
-                if slot == "breakfast":
-                    if (
-                        "breakfast" in category
-                        or "meal" in category
-                        or "rice" in category
-                        or "silog" in food_type
-                        or "breakfast" in food_type
-                        or "filling" in tags
-                        or "rice meal" in tags
-                        or meal.mealQuality == "main"
-                    ):
-                        fallback_matches.append(x[(s_idx, m_idx)])
-                        continue
-
-                if slot == "snack":
-                    if meal.mealQuality == "light":
-                        fallback_matches.append(x[(s_idx, m_idx)])
-                        continue
-
-                if slot in ["lunch", "dinner"]:
-                    if meal.mealQuality == "main":
-                        fallback_matches.append(x[(s_idx, m_idx)])
-                        continue
-
-                model.Add(x[(s_idx, m_idx)] == 0)
-
-            allowed_vars = exact_matches if exact_matches else fallback_matches
-            blocked_vars = fallback_matches if exact_matches else []
-
-            if not allowed_vars:
+            if not allowed_indices:
                 return {
                     "ok": False,
                     "message": f"No feasible meals available for slot '{slot}'.",
                 }
 
-            # exactly one from the chosen set
-            model.Add(sum(allowed_vars) == 1)
+            model.Add(sum(x[(s_idx, m_idx)] for m_idx in allowed_indices) == 1)
 
-            # if exact matches exist, fallback matches must be disabled
-            for var in blocked_vars:
-                model.Add(var == 0)
+            allowed_set = set(allowed_indices)
+            blocked_set = set(blocked_indices)
 
-        # 2) Budget constraint
+            for m_idx in range(len(meals)):
+                if m_idx in blocked_set:
+                    model.Add(x[(s_idx, m_idx)] == 0)
+                elif m_idx not in allowed_set:
+                    model.Add(x[(s_idx, m_idx)] == 0)
+
         model.Add(
             sum(
                 x[(s_idx, m_idx)] * meals[m_idx].price
@@ -244,31 +320,20 @@ def solve_meal_plans(req: SolveMealPlansRequest):
             <= req.budget
         )
 
-        # 3) Same exact meal cannot be selected more than once
         for m_idx in range(len(meals)):
             model.Add(sum(x[(s_idx, m_idx)] for s_idx in range(len(slots))) <= 1)
 
-        # 4) Category variety limit
         if req.categoryLimit > 0:
-            categories = sorted({meal.category for meal in meals if meal.category})
-            for category in categories:
-                model.Add(
-                    sum(
-                        x[(s_idx, m_idx)]
-                        for s_idx in range(len(slots))
-                        for m_idx, meal in enumerate(meals)
-                        if meal.category == category
+            for _category, indices in categories_map.items():
+                if indices:
+                    model.Add(
+                        sum(
+                            x[(s_idx, m_idx)]
+                            for s_idx in range(len(slots))
+                            for m_idx in indices
+                        )
+                        <= req.categoryLimit
                     )
-                    <= req.categoryLimit
-                )
-
-        # 5) Control main vs snack balance
-        main_indices = [
-            m_idx for m_idx, meal in enumerate(meals) if is_main(meal)
-        ]
-        light_indices = [
-            m_idx for m_idx, meal in enumerate(meals) if is_light(meal)
-        ]
 
         if main_indices:
             main_count = sum(
@@ -297,24 +362,8 @@ def solve_meal_plans(req: SolveMealPlansRequest):
             else:
                 model.Add(light_count <= 1)
 
-        # 6) Limit highly repetitive meal families
-        family_limits = {
-            "siomai": 1,
-            "shanghai": 1,
-            "sharksfin": 1,
-            "wings": 1,
-            "burger": 1,
-            "pasta": 1,
-            "sisig": 1,
-            "inasal": 1,
-            "bulgogi": 1,
-        }
-
         for family, family_limit in family_limits.items():
-            family_indices = [
-                m_idx for m_idx, meal in enumerate(meals) if has_tag(meal, family)
-            ]
-
+            family_indices = family_indices_map[family]
             if family_indices:
                 model.Add(
                     sum(
@@ -325,24 +374,8 @@ def solve_meal_plans(req: SolveMealPlansRequest):
                     <= family_limit
                 )
 
-        # 6.5) Limit repeated protein types
-        protein_limits = {
-            "chicken": 2,
-            "pork": 2,
-            "beef": 2,
-            "fish": 2,
-            "tuna": 2,
-            "spam": 1,
-            "sausage": 1,
-            "longganisa": 1,
-            "hotdog": 1,
-        }
-
         for protein, protein_limit in protein_limits.items():
-            protein_indices = [
-                m_idx for m_idx, meal in enumerate(meals) if has_tag(meal, protein)
-            ]
-
+            protein_indices = protein_indices_map[protein]
             if protein_indices:
                 model.Add(
                     sum(
@@ -353,20 +386,9 @@ def solve_meal_plans(req: SolveMealPlansRequest):
                     <= protein_limit
                 )
 
-        # 7) Limit same establishment repetition
-        establishment_names = sorted(
-            {meal.establishmentName for meal in meals if meal.establishmentName}
-        )
-
         establishment_limit = 2 if req.mealsPerDay >= 3 else req.mealsPerDay
 
-        for establishment in establishment_names:
-            establishment_indices = [
-                m_idx
-                for m_idx, meal in enumerate(meals)
-                if meal.establishmentName == establishment
-            ]
-
+        for _establishment, establishment_indices in establishments_map.items():
             if establishment_indices:
                 model.Add(
                     sum(
@@ -377,7 +399,6 @@ def solve_meal_plans(req: SolveMealPlansRequest):
                     <= establishment_limit
                 )
 
-        # 8) Exclude previous solutions by meal set, regardless of slot order
         for prev_solution in excluded_solution_keys:
             prev_indices = [
                 m_idx for m_idx, meal in enumerate(meals) if meal.id in prev_solution
@@ -393,24 +414,16 @@ def solve_meal_plans(req: SolveMealPlansRequest):
                     <= len(prev_indices) - 1
                 )
 
-        # Objective
-        objective_terms = []
-        for s_idx in range(len(slots)):
-            for m_idx, meal in enumerate(meals):
-                meal_score = compute_preference_score(
-                    meal,
-                    req.preferenceMode,
-                    req.preferredTags,
-                    req.dislikedTags,
-                    req.usedMealIds,
-                    req.usedEstablishments,
-                )
-                objective_terms.append(x[(s_idx, m_idx)] * meal_score)
-
-        model.Maximize(sum(objective_terms))
+        model.Maximize(
+            sum(
+                x[(s_idx, m_idx)] * meal_scores_by_index[m_idx]
+                for s_idx in range(len(slots))
+                for m_idx in range(len(meals))
+            )
+        )
 
         solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = 5.0
+        solver.parameters.max_time_in_seconds = 1.2
 
         status = solver.Solve(model)
 
@@ -445,9 +458,6 @@ def solve_meal_plans(req: SolveMealPlansRequest):
 
         excluded_solution_keys.append(sorted(picked_meal_ids))
 
-        print("SOLVER PICKED COUNT:", len(picked_meals))
-        print("SOLVER PICKED MEALS:", [meal["mealName"] for meal in picked_meals])
-
     if not solutions:
         cheapest_prices = sorted([meal.price for meal in meals])
         min_possible = (
@@ -470,4 +480,149 @@ def solve_meal_plans(req: SolveMealPlansRequest):
     return {
         "ok": True,
         "options": solutions,
+    }
+
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+
+@app.post("/solve")
+def solve_meal_plans(req: SolveMealPlansRequest):
+    return solve_daily_options(req)
+
+
+@app.post("/solve-weekly")
+def solve_weekly_meal_plans(req: SolveMealPlansRequest):
+    weekly_options = []
+
+    for option_index in range(req.count):
+        days = []
+        used_meal_ids = []
+        used_establishments = []
+
+        weekly_total_cost = 0
+        weekly_remaining_budget = req.budget
+        failed_day = None
+        failure_message = ""
+
+        for day_index in range(7):
+            day_budget = build_day_budget(int(req.budget), day_index)
+
+            day_req = SolveMealPlansRequest(
+                meals=req.meals,
+                budget=day_budget,
+                mealsPerDay=req.mealsPerDay,
+                count=1,
+                preferenceMode=req.preferenceMode,
+                preferredTags=req.preferredTags,
+                dislikedTags=req.dislikedTags,
+                excludeAllergens=req.excludeAllergens,
+                categoryLimit=req.categoryLimit,
+                usedMealIds=used_meal_ids,
+                usedEstablishments=used_establishments,
+            )
+
+            day_result = solve_daily_options(day_req)
+
+            if (
+                not day_result.get("ok")
+                or not isinstance(day_result.get("options"), list)
+                or not day_result["options"]
+            ):
+                failed_day = WEEK_DAYS[day_index]
+                failure_message = day_result.get(
+                    "message",
+                    f"No meal plan fits ₱{day_budget} for {failed_day}.",
+                )
+                break
+
+            picked = day_result["options"][0]
+            meals_for_day_raw = picked.get("meals", [])
+
+            if len(meals_for_day_raw) != req.mealsPerDay:
+                failed_day = WEEK_DAYS[day_index]
+                failure_message = (
+                    f"Invalid result for {failed_day}: expected "
+                    f"{req.mealsPerDay} meals, got {len(meals_for_day_raw)}."
+                )
+                break
+
+            meals_for_day = meals_for_day_raw[: req.mealsPerDay]
+
+            total_cost = sum(int(meal.get("price", 0)) for meal in meals_for_day)
+            remaining_budget = max(0, day_budget - total_cost)
+
+            days.append(
+                {
+                    "day": day_index + 1,
+                    "label": WEEK_DAYS[day_index],
+                    "budget": day_budget,
+                    "meals": meals_for_day,
+                    "totalCost": total_cost,
+                    "remainingBudget": remaining_budget,
+                }
+            )
+
+            weekly_total_cost += total_cost
+            weekly_remaining_budget -= total_cost
+
+            for meal in meals_for_day:
+                if meal.get("_id"):
+                    used_meal_ids = (used_meal_ids + [str(meal["_id"])])[-10:]
+                if meal.get("establishmentName"):
+                    used_establishments = (used_establishments + [str(meal["establishmentName"])])[-10:]
+
+        if failed_day:
+            if option_index == 0:
+                return {
+                    "ok": False,
+                    "message": (
+                        f"{failure_message} Weekly plans work best when the "
+                        f"per-day budget is realistic. Try increasing the weekly "
+                        f"budget or lowering meals per day."
+                    ),
+                }
+            break
+
+        total_weekly_meals = sum(len(day["meals"]) for day in days)
+
+        if len(days) != 7 or total_weekly_meals != 7 * req.mealsPerDay:
+            if option_index == 0:
+                return {
+                    "ok": False,
+                    "message": (
+                        f"Weekly plan validation failed. Expected "
+                        f"{7 * req.mealsPerDay} meals across 7 days, "
+                        f"got {total_weekly_meals}."
+                    ),
+                }
+            break
+
+        weekly_options.append(
+            {
+                "allowanceType": "weekly",
+                "label": build_weekly_label(option_index, req.preferenceMode),
+                "days": days,
+                "totalCost": weekly_total_cost,
+                "remainingBudget": max(0, weekly_remaining_budget),
+            }
+        )
+
+    if not weekly_options:
+        estimated_per_day = req.budget // 7
+        return {
+            "ok": False,
+            "message": (
+                f"No weekly meal plan fits ₱{req.budget} right now. "
+                f"Your estimated daily budget is about ₱{estimated_per_day}. "
+                f"Try increasing your budget or reducing meals per day."
+            ),
+        }
+
+    return {
+        "ok": True,
+        "allowanceType": "weekly",
+        "options": weekly_options,
     }
