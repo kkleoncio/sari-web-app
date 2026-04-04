@@ -185,6 +185,13 @@ if (status === "loading" || loading) {
     );
   }
 
+  function formatLabel(value: string) {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f7fbfb_0%,#eef7f7_100%)] px-6 py-8 md:px-10 lg:px-14">
       <div className="mx-auto max-w-6xl">
@@ -204,7 +211,7 @@ if (status === "loading" || loading) {
           <div className="mt-3 flex flex-wrap gap-4 text-sm text-[#023030]/70">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
-              <span>{establishment.location}</span>
+              <span>{formatLabel(establishment.location)}</span>
             </div>
 
             <div className="flex items-center gap-2">

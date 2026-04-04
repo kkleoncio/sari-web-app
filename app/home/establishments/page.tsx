@@ -184,11 +184,12 @@ export default function AllEstablishmentsPage() {
     return sorted;
   }, [establishments, search, selectedLocation, selectedCategory, sortBy]);
 
-  const mappedEstablishments: EstablishmentCard[] = filteredAndSortedEstablishments.map((est) => ({
+const mappedEstablishments: EstablishmentCard[] =
+  filteredAndSortedEstablishments.map((est) => ({
     id: est._id,
     name: est.name,
-    location: est.location,
-   openingHours: est.openingHours || "",
+    location: formatLabel(est.location),
+    openingHours: est.openingHours || "",
     tags: est.tags ?? [],
     imageUrl: est.imageUrl || "/default-img.jpg",
     priceRange: est.priceRange,
