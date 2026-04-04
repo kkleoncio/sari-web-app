@@ -251,106 +251,120 @@ function MealCard({
   }
 
   return (
-  <motion.div
-    whileHover={{ y: -6 }}
-    transition={{ type: "spring", stiffness: 220, damping: 18 }}
-    className="group relative overflow-hidden rounded-[32px] border border-white/50 bg-white/40 p-[1px] shadow-[0_18px_50px_rgba(2,48,48,0.08)] backdrop-blur-2xl"
-  >
-    {/* glass border */}
-    <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.55),rgba(255,255,255,0.1))]" />
+    <motion.div
+      whileHover={{ y: -6 }}
+      transition={{ type: "spring", stiffness: 220, damping: 18 }}
+      className="group relative overflow-hidden rounded-[32px] border border-white/50 bg-white/40 p-[1px] shadow-[0_18px_50px_rgba(2,48,48,0.08)] backdrop-blur-2xl"
+    >
+      {/* glass border */}
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.55),rgba(255,255,255,0.1))]" />
 
-    <div className="relative rounded-[31px] bg-white/60 backdrop-blur-2xl overflow-hidden">
+      <div className="relative rounded-[31px] bg-white/60 backdrop-blur-2xl overflow-hidden">
+        <div className="relative h-40 w-full">
+          {meal.imageUrl ? (
+            <>
+              <Image
+                src={meal.imageUrl}
+                alt={meal.mealName}
+                fill
+                className="object-cover transition duration-700 group-hover:scale-[1.05]"
+              />
 
-      {/* 🔥 IMAGE HEADER */}
-      <div className="relative h-40 w-full">
-        {meal.imageUrl ? (
-          <Image
-            src={meal.imageUrl}
-            alt={meal.mealName}
-            fill
-            className="object-cover transition duration-700 group-hover:scale-[1.05]"
-          />
-        ) : (
-          <div className="h-full w-full bg-[linear-gradient(135deg,#0f766e,#14b8a6)]" />
-        )}
+              {/* overlay ONLY for real images */}
+              <div className="absolute inset-0" />
+            </>
+          ) : (
+            <div className="relative h-39 w-full overflow-hidden border-b border-[#023030]/30 bg-[radial-gradient(circle_at_top_left,rgba(163,230,220,0.55),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(227,242,253,0.9),transparent_42%),linear-gradient(135deg,#f8fcfc_0%,#eef8f7_100%)]">
+              <div className="absolute right-[-18px] top-[-18px] h-24 w-24 rounded-full bg-white/30 blur-2xl" />
+              <div className="absolute bottom-[-24px] left-[-12px] h-20 w-20 rounded-full bg-[#ccffe8]/40 blur-2xl" />
 
-        {/* gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-white/90" />
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <p className="font-poppins text-xs font-semibold tracking-[0.2em] text-[#046d6d]/70">
+                  IMAGE
+                </p>
+                <p className="mt-1 font-helvetica text-sm text-[#023030]/60">
+                  Coming soon
+                </p>
+              </div>
+            </div>
+          )}
 
-        {/* category */}
-        <div className="absolute left-4 top-4">
-          <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-medium backdrop-blur-md">
-            {formatLabel(meal.category)}
-          </span>
+          {/* gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-transparent to-white/90" />
+
+          {/* category */}
+          <div className="absolute left-4 top-4">
+            <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-medium backdrop-blur-md">
+              {formatLabel(meal.category)}
+            </span>
+          </div>
+
+          {/* price */}
+          <div className="absolute right-4 top-4 rounded-2xl bg-white/85 px-4 py-2 text-sm font-semibold shadow backdrop-blur-md">
+            ₱ {meal.price.toFixed(2)}
+          </div>
         </div>
 
-        {/* price */}
-        <div className="absolute right-4 top-4 rounded-2xl bg-white/85 px-4 py-2 text-sm font-semibold shadow backdrop-blur-md">
-          ₱ {meal.price.toFixed(2)}
-        </div>
-      </div>
+        <div className="p-5">
+          {/* title */}
+          <h3 className="font-poppins text-xl font-semibold text-[#023030]">
+            {meal.mealName}
+          </h3>
 
-      {/* 🔥 CONTENT */}
-      <div className="p-5">
-        {/* title */}
-        <h3 className="font-poppins text-xl font-semibold text-[#023030]">
-          {meal.mealName}
-        </h3>
+          {/* establishment */}
+          <div className="mt-1 flex items-center gap-2 text-sm text-[#023030]/60">
+            <Store className="h-4 w-4" />
+            {meal.establishmentName}
+          </div>
 
-        {/* establishment */}
-        <div className="mt-1 flex items-center gap-2 text-sm text-[#023030]/60">
-          <Store className="h-4 w-4" />
-          {meal.establishmentName}
-        </div>
-
-        {/* description (optional if you have one) */}
-        {/* <p className="mt-3 text-sm text-[#023030]/70">
+          {/* description (optional if you have one) */}
+          {/* <p className="mt-3 text-sm text-[#023030]/70">
           Easy to fit into a student budget and daily meal plan.
         </p> */}
 
-        {/* badges */}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700">
-            Student-budget friendly
-          </span>
-
-          <span className="rounded-full bg-white px-3 py-1 text-xs text-[#023030]/70 ring-1 ring-[#023030]/10">
-            Popular pick
-          </span>
-
-          {meal.isFried && (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-700">
-              Fried
+          {/* badges */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700">
+              Student-budget friendly
             </span>
-          )}
-        </div>
 
-        {/* divider */}
-        <div className="my-4 h-px bg-[#023030]/10" />
+            <span className="rounded-full bg-white px-3 py-1 text-xs text-[#023030]/70 ring-1 ring-[#023030]/10">
+              Popular pick
+            </span>
 
-        {/* footer */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[11px] tracking-wider text-[#023030]/40">
-              BEST FOR
-            </p>
-            <p className="text-sm font-medium text-[#023030]">
-              {meal.mealTime?.join(" / ") || "Any time"}
-            </p>
+            {meal.isFried && (
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-700">
+                Fried
+              </span>
+            )}
           </div>
 
-          <Button
-            onClick={() => onAddMeal(meal)}
-            className="rounded-2xl bg-[#026d6d] px-5 text-white shadow-md hover:bg-[#025555]"
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Add
-          </Button>
+          {/* divider */}
+          <div className="my-4 h-px bg-[#023030]/10" />
+
+          {/* footer */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] tracking-wider text-[#023030]/40">
+                BEST FOR
+              </p>
+              <p className="text-sm font-medium text-[#023030]">
+                {meal.mealTime?.join(" / ") || "Any time"}
+              </p>
+            </div>
+
+            <Button
+              onClick={() => onAddMeal(meal)}
+              className="rounded-2xl bg-[#026d6d] px-5 text-white shadow-md hover:bg-[#025555]"
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Add
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
-  </motion.div>
-);
+    </motion.div>
+  );
 }
 
 export default function AllMealsPage() {
@@ -368,11 +382,11 @@ export default function AllMealsPage() {
     if (typeof window === "undefined") return;
 
     const existingManualMeals: Meal[] = JSON.parse(
-      localStorage.getItem("manualMealPlan") || "[]"
+      localStorage.getItem("manualMealPlan") || "[]",
     );
 
     const alreadyAdded = existingManualMeals.some(
-      (item) => item._id === meal._id
+      (item) => item._id === meal._id,
     );
 
     if (alreadyAdded) {
@@ -426,19 +440,19 @@ export default function AllMealsPage() {
 
   const categories = React.useMemo(() => {
     return Array.from(
-      new Set(meals.map((meal) => meal.category).filter(Boolean))
+      new Set(meals.map((meal) => meal.category).filter(Boolean)),
     ).sort();
   }, [meals]);
 
   const foodTypes = React.useMemo(() => {
     return Array.from(
-      new Set(meals.map((meal) => meal.foodType).filter(Boolean))
+      new Set(meals.map((meal) => meal.foodType).filter(Boolean)),
     ).sort();
   }, [meals]);
 
   const mealTimes = React.useMemo(() => {
     return Array.from(
-      new Set(meals.flatMap((meal) => (meal.mealTime ?? []).filter(Boolean)))
+      new Set(meals.flatMap((meal) => (meal.mealTime ?? []).filter(Boolean))),
     ).sort();
   }, [meals]);
 
@@ -450,7 +464,7 @@ export default function AllMealsPage() {
         label: formatLabel(category),
       })),
     ],
-    [categories]
+    [categories],
   );
 
   const foodTypeOptions = React.useMemo(
@@ -461,7 +475,7 @@ export default function AllMealsPage() {
         label: formatLabel(foodType),
       })),
     ],
-    [foodTypes]
+    [foodTypes],
   );
 
   const mealTimeOptions = React.useMemo(
@@ -472,7 +486,7 @@ export default function AllMealsPage() {
         label: formatLabel(mealTime),
       })),
     ],
-    [mealTimes]
+    [mealTimes],
   );
 
   const priceOptions = React.useMemo(
@@ -482,7 +496,7 @@ export default function AllMealsPage() {
       { value: "50to99", label: "PHP 50–99" },
       { value: "100plus", label: "PHP 100+" },
     ],
-    []
+    [],
   );
 
   const sortOptions = React.useMemo(
@@ -493,7 +507,7 @@ export default function AllMealsPage() {
       { value: "price-high-low", label: "Price: High to Low" },
       { value: "establishment-asc", label: "Establishment: A to Z" },
     ],
-    []
+    [],
   );
 
   const filteredMeals = React.useMemo(() => {
@@ -636,36 +650,6 @@ export default function AllMealsPage() {
                   <p className="text-sm text-[#023030]/60">meals</p>
                 </div>
               </div>
-
-              {/* <div className="rounded-[26px] border border-white/45 bg-white/58 p-1.5 shadow-[0_10px_28px_rgba(2,48,48,0.06)] backdrop-blur-xl">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("grid")}
-                    className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
-                      viewMode === "grid"
-                        ? "bg-[linear-gradient(135deg,#023030_0%,#046d6d_100%)] text-white shadow-[0_10px_20px_rgba(2,48,48,0.18)]"
-                        : "text-[#026d6d] hover:bg-white/65"
-                    }`}
-                  >
-                    <Grid2X2 className="h-4 w-4" />
-                    Grid
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("compact")}
-                    className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
-                      viewMode === "compact"
-                        ? "bg-[linear-gradient(135deg,#023030_0%,#046d6d_100%)] text-white shadow-[0_10px_20px_rgba(2,48,48,0.18)]"
-                        : "text-[#026d6d] hover:bg-white/65"
-                    }`}
-                  >
-                    <Rows3 className="h-4 w-4" />
-                    Compact
-                  </button>
-                </div>
-              </div> */}
             </div>
           </div>
         </motion.div>
@@ -761,34 +745,34 @@ export default function AllMealsPage() {
         </motion.div>
 
         <div className="rounded-[26px] border border-white/45 bg-white/58 p-1.5 shadow-[0_10px_28px_rgba(2,48,48,0.06)] backdrop-blur-xl mt-4">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("grid")}
-                    className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
-                      viewMode === "grid"
-                        ? "bg-[linear-gradient(135deg,#023030_0%,#046d6d_100%)] text-white shadow-[0_10px_20px_rgba(2,48,48,0.18)]"
-                        : "text-[#026d6d] hover:bg-white/65"
-                    }`}
-                  >
-                    <Grid2X2 className="h-4 w-4" />
-                    Grid
-                  </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
+                viewMode === "grid"
+                  ? "bg-[linear-gradient(135deg,#023030_0%,#046d6d_100%)] text-white shadow-[0_10px_20px_rgba(2,48,48,0.18)]"
+                  : "text-[#026d6d] hover:bg-white/65"
+              }`}
+            >
+              <Grid2X2 className="h-4 w-4" />
+              Grid
+            </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("compact")}
-                    className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
-                      viewMode === "compact"
-                        ? "bg-[linear-gradient(135deg,#023030_0%,#046d6d_100%)] text-white shadow-[0_10px_20px_rgba(2,48,48,0.18)]"
-                        : "text-[#026d6d] hover:bg-white/65"
-                    }`}
-                  >
-                    <Rows3 className="h-4 w-4" />
-                    Compact
-                  </button>
-                </div>
-              </div>
+            <button
+              type="button"
+              onClick={() => setViewMode("compact")}
+              className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
+                viewMode === "compact"
+                  ? "bg-[linear-gradient(135deg,#023030_0%,#046d6d_100%)] text-white shadow-[0_10px_20px_rgba(2,48,48,0.18)]"
+                  : "text-[#026d6d] hover:bg-white/65"
+              }`}
+            >
+              <Rows3 className="h-4 w-4" />
+              Compact
+            </button>
+          </div>
+        </div>
 
         {loading ? (
           <motion.div
