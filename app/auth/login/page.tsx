@@ -282,7 +282,7 @@ export default function LoginPage() {
         {/* Avatars */}
         <div className="absolute bottom-8 right-10 flex items-center">
           <img
-            src="/avatar.png"
+            src="/avatar.jpg"
             className="h-8 w-8 rounded-full border-2 border-white object-cover"
           />
           <img
