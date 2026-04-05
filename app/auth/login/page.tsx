@@ -54,7 +54,7 @@ export default function LoginPage() {
         router.push("/home");
       }
 
-      router.refresh();
+      // router.refresh();
     } catch (err) {
       console.error("LOGIN ERROR:", err);
       setError("Network error. Please try again.");

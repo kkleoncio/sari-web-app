@@ -65,7 +65,7 @@ export default function SignupPage() {
       localStorage.setItem("userEmail", form.email);
 
       router.push("/home");
-      router.refresh();
+      // router.refresh();
     } catch (error) {
       console.error("SIGNUP ERROR:", error);
       setError("Network error. Please try again.");
