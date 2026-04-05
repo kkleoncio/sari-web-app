@@ -61,6 +61,9 @@ export default function SignupPage() {
         return;
       }
 
+      localStorage.setItem("firstName", form.firstName);
+      localStorage.setItem("userEmail", form.email);
+
       router.push("/home");
       router.refresh();
     } catch (error) {

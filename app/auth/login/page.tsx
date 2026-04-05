@@ -7,7 +7,7 @@ import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
-  const router = useRouter(); 
+  const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -18,39 +18,50 @@ export default function LoginPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError("");
-  setIsSubmitting(true);
+    e.preventDefault();
+    setError("");
+    setIsSubmitting(true);
 
-  try {
-    const result = await signIn("credentials", {
-      email: form.email,
-      password: form.password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email: form.email,
+        password: form.password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      setError("Invalid email or password.");
-      return;
+      if (result?.error) {
+        setError("Invalid email or password.");
+        return;
+      }
+
+      const sessionRes = await fetch("/api/auth/session");
+      const session = await sessionRes.json();
+
+      const userId = session?.user?.id;
+
+      if (userId) {
+        const res = await fetch(`/api/users/${userId}`);
+        const data = await res.json();
+
+        if (data?.user?.firstName) {
+          localStorage.setItem("firstName", data.user.firstName);
+        }
+      }
+
+      if (session?.user?.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/home");
+      }
+
+      router.refresh();
+    } catch (err) {
+      console.error("LOGIN ERROR:", err);
+      setError("Network error. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const sessionRes = await fetch("/api/auth/session");
-    const session = await sessionRes.json();
-
-    if (session?.user?.role === "admin") {
-      router.push("/admin");
-    } else {
-      router.push("/home");
-    }
-
-    router.refresh();
-  } catch (err) {
-    console.error("LOGIN ERROR:", err);
-    setError("Network error. Please try again.");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const handleGoogleSignIn = async () => {
     await signIn("google", { redirectTo: "/home" });
@@ -66,7 +77,9 @@ export default function LoginPage() {
 
       <div className="relative flex min-h-screen items-center justify-center px-4 py-6 lg:py-10">
         {/* Figma-like container sizing */}
-<div className="w-full max-w-[950px] lg:h-[600px] overflow-hidden rounded-3xl border border-white/35 bg-white/10 shadow-2xl backdrop-blur-xl">                 <div className="grid h-full grid-cols-1 lg:grid-cols-2">
+        <div className="w-full max-w-[950px] lg:h-[600px] overflow-hidden rounded-3xl border border-white/35 bg-white/10 shadow-2xl backdrop-blur-xl">
+          {" "}
+          <div className="grid h-full grid-cols-1 lg:grid-cols-2">
             {/* LEFT */}
             <div className="relative flex items-center justify-center bg-white/10 px-6 py-10 lg:px-18">
               {/* center divider like Figma */}
@@ -84,7 +97,7 @@ export default function LoginPage() {
                 </p>
 
                 {/* Tabs (smaller + tighter) */}
-                <div className="mx-auto mt-5 flex w-full max-w-[280px] rounded-xl border border-gray-300/60 bg-white/15 p-1">            
+                <div className="mx-auto mt-5 flex w-full max-w-[280px] rounded-xl border border-gray-300/60 bg-white/15 p-1">
                   <button
                     type="button"
                     onClick={() => setActiveTab("signin")}
@@ -179,7 +192,7 @@ export default function LoginPage() {
                   </div>
 
                   {/* Sign in */}
-                 <button
+                  <button
                     type="submit"
                     disabled={isSubmitting}
                     className="font-helvetica mt-2 w-full rounded-xl bg-[linear-gradient(135deg,#0a8f8f_0%,#046d6d_45%,#033f3f_90%,#022b2b_100%)] py-2.5 text-[13px] font-light text-white shadow-[0_8px_18px_rgba(2,48,48,0.25)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(2,48,48,0.35)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
@@ -217,85 +230,86 @@ export default function LoginPage() {
               </div>
             </div>
 
-      {/* RIGHT PANEL */}
-      <div className="relative hidden lg:block h-full overflow-hidden rounded-r-3xl">
-        {/* Background */}
-        <Image
-          src="/right-signin.png"
-          alt="SARI welcome card"
-          fill
-          className="object-cover"
-          priority
-        />
+            {/* RIGHT PANEL */}
+            <div className="relative hidden lg:block h-full overflow-hidden rounded-r-3xl">
+              {/* Background */}
+              <Image
+                src="/right-signin.png"
+                alt="SARI welcome card"
+                fill
+                className="object-cover"
+                priority
+              />
 
-      {/* Optional overlay for readability (keep subtle since your design is already readable) */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
+              {/* Optional overlay for readability (keep subtle since your design is already readable) */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
 
-      {/* Logo */}
-      <div className="absolute left-3 top-7 z-20 h-48 w-48  ">
-        <Image
-          src="/sari-logo-yellow.png"
-          alt="SARI logo"
-          fill
-          className="object-contain"
-          priority
-        />
-      </div>
+              {/* Logo */}
+              <div className="absolute left-3 top-7 z-20 h-48 w-48  ">
+                <Image
+                  src="/sari-logo-yellow.png"
+                  alt="SARI logo"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
 
-      {/* Text */}
-      <div className="absolute left-12 bottom-63 z-20 max-w-[420px] text-white">
-        <h2 className="text-3xl font-semibold font-poppins leading-tight drop-shadow">
-          Welcome to SARI
-        </h2>
+              {/* Text */}
+              <div className="absolute left-12 bottom-63 z-20 max-w-[420px] text-white">
+                <h2 className="text-3xl font-semibold font-poppins leading-tight drop-shadow">
+                  Welcome to SARI
+                </h2>
 
-        <p className="mt-3 text-xs leading-snug text-white/90 drop-shadow font-helvetica font-extralight">
-          Not sure what to eat today? Enter your budget and get a full <br />
-          day&apos;s worth of meals planned in seconds.
-        </p>
+                <p className="mt-3 text-xs leading-snug text-white/90 drop-shadow font-helvetica font-extralight">
+                  Not sure what to eat today? Enter your budget and get a full{" "}
+                  <br />
+                  day&apos;s worth of meals planned in seconds.
+                </p>
 
-        <p className="mt-4 text-xs text-white/90 drop-shadow font-helvetica font-extralight">
-          Sign up for free and let sari handle the rest
-        </p>
-      </div>
+                <p className="mt-4 text-xs text-white/90 drop-shadow font-helvetica font-extralight">
+                  Sign up for free and let sari handle the rest
+                </p>
+              </div>
 
-      {/* CARD */}
-      <div className="absolute left-12 bottom-12 z-20 w-[370px]">
-        <Image
-          src="/Subtract.png"
-          alt="Budget card"
-          width={740}
-          height={320}
-          className="h-auto w-full"
-          priority
-        />
+              {/* CARD */}
+              <div className="absolute left-12 bottom-12 z-20 w-[370px]">
+                <Image
+                  src="/Subtract.png"
+                  alt="Budget card"
+                  width={740}
+                  height={320}
+                  className="h-auto w-full"
+                  priority
+                />
 
-        <p className="mt-3 text-md leading-snug text-[#023030] drop-shadow font-poppins font-semibold absolute left-8 top-5">
-          Your daily budget can go  <br />
-          further than you think
-        </p>
+                <p className="mt-3 text-md leading-snug text-[#023030] drop-shadow font-poppins font-semibold absolute left-8 top-5">
+                  Your daily budget can go <br />
+                  further than you think
+                </p>
 
-        <p className="mt-3 text-xs leading-snug text-[#023030] drop-shadow font-helvetica font-light absolute left-8 top-20">
-          Be one of the first iskolars to eat  <br />
-          smarter with sari
-        </p>
+                <p className="mt-3 text-xs leading-snug text-[#023030] drop-shadow font-helvetica font-light absolute left-8 top-20">
+                  Be one of the first iskolars to eat <br />
+                  smarter with sari
+                </p>
 
-        {/* Avatars */}
-        <div className="absolute bottom-8 right-10 flex items-center">
-          <img
-            src="/avatar.jpg"
-            className="h-8 w-8 rounded-full border-2 border-white object-cover"
-          />
-          <img
-            src="/avatar2.jpg"
-            className="-ml-3 h-8 w-8 rounded-full border-2 border-white object-cover"
-          />
-          <img
-            src="/avatar3.jpg"
-            className="-ml-3 h-8 w-8 rounded-full border-2 border-white object-cover"
-          />
-        </div>
-      </div>
-      </div>
+                {/* Avatars */}
+                <div className="absolute bottom-8 right-10 flex items-center">
+                  <img
+                    src="/avatar.jpg"
+                    className="h-8 w-8 rounded-full border-2 border-white object-cover"
+                  />
+                  <img
+                    src="/avatar2.jpg"
+                    className="-ml-3 h-8 w-8 rounded-full border-2 border-white object-cover"
+                  />
+                  <img
+                    src="/avatar3.jpg"
+                    className="-ml-3 h-8 w-8 rounded-full border-2 border-white object-cover"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

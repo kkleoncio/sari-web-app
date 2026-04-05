@@ -863,7 +863,7 @@ const userId = session?.user?.id ?? "";
                         title="No posts yet"
                         body="Your community posts will appear here once you start sharing food finds and budget tips."
                         buttonLabel="Go to Community"
-                        href="/community"
+                        href="/home/community"
                       />
                     ) : (
                       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
