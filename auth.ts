@@ -23,39 +23,39 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       const email = String(credentials?.email || "").trim().toLowerCase();
       const password = String(credentials?.password || "");
 
-      console.log("🔐 LOGIN ATTEMPT:", email);
+      // console.log("🔐 LOGIN ATTEMPT:", email);
 
       if (!email || !password) {
-        console.log("❌ Missing email or password");
+        // console.log("❌ Missing email or password");
         return null;
       }
 
       const user = await User.findOne({ email }).lean();
-      console.log("👤 FOUND USER:", user);
+      //console.log("👤 FOUND USER:", user);
 
       if (!user) {
-        console.log("❌ User not found");
+        // console.log("❌ User not found");
         return null;
       }
 
       if (!user.password) {
-        console.log("❌ User has no password (maybe Google account)");
+        // console.log("❌ User has no password (maybe Google account)");
         return null;
       }
 
       const isMatch = await bcrypt.compare(password, user.password);
-      console.log("🔑 PASSWORD MATCH:", isMatch);
+      // console.log("🔑 PASSWORD MATCH:", isMatch);
 
       if (!isMatch) {
-        console.log("❌ Password incorrect");
+        // console.log("❌ Password incorrect");
         return null;
       }
 
-      console.log("✅ LOGIN SUCCESS:", {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-      });
+      // console.log("✅ LOGIN SUCCESS:", {
+      //   id: user._id,
+      //   email: user.email,
+      //   role: user.role,
+      // });
 
       return {
         id: String(user._id),
@@ -116,7 +116,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.picture = user.image ?? null;
       }
 
-      console.log("🪙 JWT CALLBACK:", { token, user });
+      // console.log("🪙 JWT CALLBACK:", { token, user });
 
       return token;
     },
@@ -129,7 +129,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.image = token.picture ?? null;
       }
 
-      console.log("📦 SESSION CALLBACK:", { session, token });
+      // console.log("📦 SESSION CALLBACK:", { session, token });
 
       return session;
     },

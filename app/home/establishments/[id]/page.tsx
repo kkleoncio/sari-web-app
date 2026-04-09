@@ -284,6 +284,17 @@ export default function EstablishmentMenuPage() {
     return sorted;
   }, [meals, search, sortBy]);
 
+   const icons = ["🍛", "🍜", "🥗", "🍲"];
+    const [iconIndex, setIconIndex] = React.useState(0);
+  
+    React.useEffect(() => {
+      const iconInterval = setInterval(() => {
+        setIconIndex((prev) => (prev + 1) % icons.length);
+      }, 1200);
+      return () => clearInterval(iconInterval);
+    }, []);
+  
+
   if (status === "loading" || loading) {
     return (
       <div
@@ -293,10 +304,10 @@ export default function EstablishmentMenuPage() {
             "radial-gradient(circle at 10% 10%, rgba(45,212,191,0.18) 0%, transparent 24%), radial-gradient(circle at 85% 12%, rgba(56,189,248,0.14) 0%, transparent 25%), radial-gradient(circle at 20% 85%, rgba(167,243,208,0.22) 0%, transparent 28%), linear-gradient(180deg, #f7fcfb 0%, #edf8f7 100%)",
         }}
       >
-        <div className="w-full max-w-sm rounded-[30px] border border-white/35 bg-white/50 p-8 shadow-[0_20px_60px_rgba(2,48,48,0.10)] backdrop-blur-2xl">
+        <div className="w-full max-w-sm p-8 backdrop-blur-2xl">
           <div className="mb-6 flex flex-col items-center text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/40 bg-white/60">
-              <UtensilsCrossed className="h-8 w-8 text-[#046d6d]" />
+             <div className="mb-4 flex justify-center text-3xl transition-all duration-300">
+              {icons[iconIndex]}
             </div>
             <h2 className="font-poppins text-xl font-semibold text-[#023030]">
               Loading menu
@@ -306,9 +317,10 @@ export default function EstablishmentMenuPage() {
             </p>
           </div>
 
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#023030]/8">
-            <div className="h-full w-1/3 animate-[loading_1.2s_ease-in-out_infinite] rounded-full bg-[linear-gradient(90deg,#0b6b57_0%,#34d399_50%,#0b6b57_100%)]" />
-          </div>
+          {/* Premium Loading Bar */}
+        <div className="mt-6 h-2.5 w-full overflow-hidden rounded-full bg-[#023030]/10 relative">
+          <div className="absolute top-0 left-0 h-full w-1/2 rounded-full bg-[linear-gradient(90deg,#0b6b57_0%,#34d399_55%,#0b6b57_100%)] animate-[loading-slide_1.2s_ease-in-out_infinite]" />
+        </div>
         </div>
       </div>
     );
@@ -358,7 +370,7 @@ export default function EstablishmentMenuPage() {
                 <div className="max-w-2xl">
                   <Link
                     href="/home"
-                    className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/24 px-3.5 py-1.5 text-sm font-medium text-white shadow-[0_8px_20px_rgba(2,48,48,0.05)] backdrop-blur-md transition hover:text-[#023030]"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/24 px-3.5 py-1.5 text-sm font-medium text-white shadow-[0_8px_20px_rgba(2,48,48,0.05)] backdrop-blur-md transition hover:text-white hover:bg-white/50"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     Back to home
