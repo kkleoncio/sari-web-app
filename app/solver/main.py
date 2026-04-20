@@ -633,7 +633,7 @@ def solve_weekly_meal_plans(req: SolveMealPlansRequest):
             if len(meals_for_day_raw) != req.mealsPerDay:
                 failed_day = WEEK_DAYS[day_index]
                 failure_message = (
-                    f"Invalid result for {failedDay}: expected "
+                    f"Invalid result for {failed_day}: expected "
                     f"{req.mealsPerDay} meals, got {len(meals_for_day_raw)}."
                 )
                 break
