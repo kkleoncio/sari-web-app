@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 from ortools.sat.python import cp_model
+import hashlib
 
 app = FastAPI()
 
@@ -93,6 +94,12 @@ def label_option(index: int, preference_mode: str) -> str:
     return "Suggested option"
 
 
+def tiny_tiebreak_bonus(meal_id: str, solution_index: int) -> int:
+    raw = f"{meal_id}:{solution_index}".encode()
+    digest = hashlib.md5(raw).hexdigest()
+    return int(digest[:2], 16) % 3
+
+
 def compute_preference_score_precomputed(
     meal: Meal,
     meal_tags: set[str],
@@ -101,6 +108,7 @@ def compute_preference_score_precomputed(
     disliked: set[str],
     used_meal_ids_set: set[str],
     used_establishments_set: set[str],
+    solution_index: int,
 ) -> int:
     score = 0
 
@@ -130,16 +138,19 @@ def compute_preference_score_precomputed(
             score -= 2
 
     if meal.id.lower() in used_meal_ids_set:
-        score -= 20
+        score -= 55
 
     if meal.establishmentName and meal.establishmentName.lower() in used_establishments_set:
-        score -= 6
+        score -= 18
+
+    score += tiny_tiebreak_bonus(meal.id, solution_index)
 
     return score
 
 
 def solve_daily_options(req: SolveMealPlansRequest) -> dict:
     meals = [meal for meal in req.meals if meal.isStandalone is not False]
+    print(f"[solver] candidate meals received: {len(meals)}")
     slots = get_meal_slots(req.mealsPerDay)
 
     if not meals:
@@ -148,13 +159,13 @@ def solve_daily_options(req: SolveMealPlansRequest) -> dict:
     preferred_set = {tag.lower() for tag in req.preferredTags}
     disliked_set = {tag.lower() for tag in req.dislikedTags}
     blocked_allergens = {a.lower() for a in req.excludeAllergens}
-    used_meal_ids_set = {value.lower() for value in req.usedMealIds}
-    used_establishments_set = {value.lower() for value in req.usedEstablishments}
+
+    base_used_meal_ids_set = {value.lower() for value in req.usedMealIds}
+    base_used_establishments_set = {value.lower() for value in req.usedEstablishments}
 
     normalized_tags_by_index: List[set[str]] = []
     normalized_allergens_by_index: List[set[str]] = []
     normalized_meal_times_by_index: List[set[str]] = []
-    meal_scores_by_index: List[int] = []
 
     main_indices: List[int] = []
     light_indices: List[int] = []
@@ -198,17 +209,6 @@ def solve_daily_options(req: SolveMealPlansRequest) -> dict:
         normalized_allergens_by_index.append(allergens_set)
         normalized_meal_times_by_index.append(meal_times_set)
 
-        meal_score = compute_preference_score_precomputed(
-            meal=meal,
-            meal_tags=tags_set,
-            preference_mode=req.preferenceMode,
-            preferred=preferred_set,
-            disliked=disliked_set,
-            used_meal_ids_set=used_meal_ids_set,
-            used_establishments_set=used_establishments_set,
-        )
-        meal_scores_by_index.append(meal_score)
-
         if meal.mealQuality == "main":
             main_indices.append(m_idx)
         if meal.mealQuality == "light":
@@ -218,7 +218,7 @@ def solve_daily_options(req: SolveMealPlansRequest) -> dict:
             categories_map.setdefault(meal.category, []).append(m_idx)
 
         if meal.establishmentName:
-            establishments_map.setdefault(meal.establishmentName, []).append(m_idx)
+            establishments_map.setdefault(meal.establishmentName.lower(), []).append(m_idx)
 
         for family in family_limits:
             if family in tags_set:
@@ -279,7 +279,9 @@ def solve_daily_options(req: SolveMealPlansRequest) -> dict:
     solutions = []
     excluded_solution_keys: List[List[str]] = []
 
+    
     for solution_index in range(req.count):
+        print(f"\n[solver] --- generating option {solution_index + 1} ---")
         model = cp_model.CpModel()
 
         x = {}
@@ -399,6 +401,8 @@ def solve_daily_options(req: SolveMealPlansRequest) -> dict:
                     <= establishment_limit
                 )
 
+        # Strict diversity for daily suggestions:
+        # do not allow any meal from an earlier option to appear again.
         for prev_solution in excluded_solution_keys:
             prev_indices = [
                 m_idx for m_idx, meal in enumerate(meals) if meal.id in prev_solution
@@ -411,8 +415,77 @@ def solve_daily_options(req: SolveMealPlansRequest) -> dict:
                         for s_idx in range(len(slots))
                         for m_idx in prev_indices
                     )
-                    <= len(prev_indices) - 1
+                    == 0
                 )
+
+        previous_solution_establishments: List[set[str]] = []
+        for existing_solution in solutions:
+            ests = set()
+            for meal in existing_solution["meals"]:
+                est = str(meal.get("establishmentName", "")).strip().lower()
+                if est:
+                    ests.add(est)
+            if ests:
+                previous_solution_establishments.append(ests)
+
+        for prev_ests in previous_solution_establishments:
+            prev_est_indices = []
+            for est in prev_ests:
+                prev_est_indices.extend(establishments_map.get(est, []))
+
+            prev_est_indices = list(set(prev_est_indices))
+
+            if prev_est_indices:
+                model.Add(
+                    sum(
+                        x[(s_idx, m_idx)]
+                        for s_idx in range(len(slots))
+                        for m_idx in prev_est_indices
+                    )
+                    <= 1
+                )
+
+        current_used_meal_ids_set = set(base_used_meal_ids_set)
+        current_used_establishments_set = set(base_used_establishments_set)
+
+        for existing_solution in solutions:
+            for meal in existing_solution["meals"]:
+                meal_id = str(meal.get("_id", "")).lower()
+                est = str(meal.get("establishmentName", "")).lower()
+
+                if meal_id:
+                    current_used_meal_ids_set.add(meal_id)
+                if est:
+                    current_used_establishments_set.add(est)
+
+        if current_used_meal_ids_set:
+            print("[solver] banning previously used meals:", sorted(current_used_meal_ids_set))
+
+        if current_used_establishments_set:
+            print(
+                "[solver] penalizing previously used establishments:",
+                sorted(current_used_establishments_set),
+            )
+
+        # Hard-ban meals already used by earlier returned options.
+        for m_idx, meal in enumerate(meals):
+            if meal.id.lower() in current_used_meal_ids_set:
+                for s_idx in range(len(slots)):
+                    model.Add(x[(s_idx, m_idx)] == 0)
+
+        meal_scores_by_index: List[int] = []
+        for m_idx, meal in enumerate(meals):
+            meal_score = compute_preference_score_precomputed(
+                meal=meal,
+                meal_tags=normalized_tags_by_index[m_idx],
+                preference_mode=req.preferenceMode,
+                preferred=preferred_set,
+                disliked=disliked_set,
+                used_meal_ids_set=current_used_meal_ids_set,
+                used_establishments_set=current_used_establishments_set,
+                solution_index=solution_index,
+            )
+            meal_scores_by_index.append(meal_score)
 
         model.Maximize(
             sum(
@@ -433,11 +506,27 @@ def solve_daily_options(req: SolveMealPlansRequest) -> dict:
         picked_meals = []
         picked_meal_ids = []
 
+        print(
+            "[solver] picked meals:",
+            [
+                f"{meal['mealName']} ({meal['establishmentName']}) ₱{meal['price']}"
+                for meal in picked_meals
+            ],
+        )
+
         for s_idx in range(len(slots)):
             for m_idx, meal in enumerate(meals):
                 if solver.Value(x[(s_idx, m_idx)]) == 1:
                     picked_meals.append(meal.model_dump(by_alias=True))
                     picked_meal_ids.append(meal.id)
+
+        print(
+            "[solver] picked meals:",
+            [
+                f"{meal['mealName']} ({meal['establishmentName']}) ₱{meal['price']}"
+                for meal in picked_meals
+            ],
+        )
 
         if not picked_meals:
             break
@@ -544,7 +633,7 @@ def solve_weekly_meal_plans(req: SolveMealPlansRequest):
             if len(meals_for_day_raw) != req.mealsPerDay:
                 failed_day = WEEK_DAYS[day_index]
                 failure_message = (
-                    f"Invalid result for {failed_day}: expected "
+                    f"Invalid result for {failedDay}: expected "
                     f"{req.mealsPerDay} meals, got {len(meals_for_day_raw)}."
                 )
                 break

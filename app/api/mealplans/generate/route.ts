@@ -167,7 +167,6 @@ function trimMealsForSolver(
     return price > 0 && price <= maxReasonableMealPrice;
   });
 
-  // Prefer the filtered set whenever possible instead of jumping back to full dataset.
   if (filtered.length > 0) {
     return filtered;
   }
@@ -207,6 +206,88 @@ async function postToSolver(
   } finally {
     clear();
   }
+}
+
+function countMealOverlap(a: any, b: any) {
+  const aIds = new Set((a.meals || []).map((meal: any) => String(meal._id)));
+  const bIds = new Set((b.meals || []).map((meal: any) => String(meal._id)));
+
+  let overlap = 0;
+  for (const id of aIds) {
+    if (bIds.has(id)) overlap += 1;
+  }
+  return overlap;
+}
+
+function countEstablishmentOverlap(a: any, b: any) {
+  const aEsts = new Set(
+    (a.meals || [])
+      .map((meal: any) => String(meal.establishmentName ?? "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const bEsts = new Set(
+    (b.meals || [])
+      .map((meal: any) => String(meal.establishmentName ?? "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+  let overlap = 0;
+  for (const est of aEsts) {
+    if (bEsts.has(est)) overlap += 1;
+  }
+  return overlap;
+}
+
+function diversifyOptions(options: any[], targetCount: number) {
+  const sorted = [...options].sort((a, b) => {
+    const scoreDiff = Number(b.score ?? 0) - Number(a.score ?? 0);
+    if (scoreDiff !== 0) return scoreDiff;
+
+    const remainingBudgetDiff =
+      Number(b.remainingBudget ?? 0) - Number(a.remainingBudget ?? 0);
+    if (remainingBudgetDiff !== 0) return remainingBudgetDiff;
+
+    return Number(a.totalCost ?? 0) - Number(b.totalCost ?? 0);
+  });
+
+  const picked: any[] = [];
+
+  for (const option of sorted) {
+    const tooSimilar = picked.some((existing) => {
+    const mealOverlap = countMealOverlap(existing, option);
+    const establishmentOverlap = countEstablishmentOverlap(existing, option);
+
+    console.log(
+      "[diversify] comparing",
+      option.meals.map((m: any) => m.mealName),
+      "vs",
+      existing.meals.map((m: any) => m.mealName),
+      "| mealOverlap:",
+      mealOverlap,
+      "| establishmentOverlap:",
+      establishmentOverlap
+    );
+
+    return mealOverlap >= 1 || establishmentOverlap >= 2;
+  });
+
+    if (!tooSimilar) {
+      picked.push(option);
+    }
+
+    if (picked.length >= targetCount) {
+      return picked;
+    }
+  }
+
+  for (const option of sorted) {
+    if (picked.length >= targetCount) break;
+    if (!picked.includes(option)) {
+      picked.push(option);
+    }
+  }
+
+  return picked;
 }
 
 export async function POST(req: NextRequest) {
@@ -339,28 +420,28 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedMeals = meals.map((meal: any) => ({
-  _id: String(meal._id),
-  mealName: String(meal.mealName ?? ""),
-  foodType: String(meal.foodType ?? "").toLowerCase(),
-  category: String(meal.category ?? "").toLowerCase(),
-  price: Math.round(Number(meal.price || 0)),
-  establishmentName: String(meal.establishmentName ?? ""),
-  mealTime: Array.isArray(meal.mealTime)
-    ? meal.mealTime.map((m: string) => String(m).toLowerCase())
-    : [],
-  healthScore: Math.round(Number(meal.healthScore || 5)),
-  isFried: Boolean(meal.isFried),
-  isSoup: Boolean(meal.isSoup),
-  isVegetarian: Boolean(meal.isVegetarian),
-  tags: Array.isArray(meal.tags)
-    ? meal.tags.map((tag: string) => String(tag).toLowerCase())
-    : [],
-  allergens: Array.isArray(meal.allergens)
-    ? meal.allergens.map((a: string) => String(a).toLowerCase())
-    : [],
-  mealQuality: meal.mealQuality ?? "light",
-  isStandalone: meal.isStandalone !== false,
-}));
+      _id: String(meal._id),
+      mealName: String(meal.mealName ?? ""),
+      foodType: String(meal.foodType ?? "").toLowerCase(),
+      category: String(meal.category ?? "").toLowerCase(),
+      price: Math.round(Number(meal.price || 0)),
+      establishmentName: String(meal.establishmentName ?? ""),
+      mealTime: Array.isArray(meal.mealTime)
+        ? meal.mealTime.map((m: string) => String(m).toLowerCase())
+        : [],
+      healthScore: Math.round(Number(meal.healthScore || 5)),
+      isFried: Boolean(meal.isFried),
+      isSoup: Boolean(meal.isSoup),
+      isVegetarian: Boolean(meal.isVegetarian),
+      tags: Array.isArray(meal.tags)
+        ? meal.tags.map((tag: string) => String(tag).toLowerCase())
+        : [],
+      allergens: Array.isArray(meal.allergens)
+        ? meal.allergens.map((a: string) => String(a).toLowerCase())
+        : [],
+      mealQuality: meal.mealQuality ?? "light",
+      isStandalone: meal.isStandalone !== false,
+    }));
 
     const solverCandidateMeals = trimMealsForSolver(
       normalizedMeals,
@@ -396,25 +477,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Keep payload light, but still include fields needed by solver + UI response.
     const solverBasePayload = {
       meals: solverCandidateMeals.map((meal: any) => ({
-  _id: meal._id,
-  mealName: meal.mealName,
-  foodType: String(meal.foodType ?? "").toLowerCase(),
-  category: meal.category,
-  price: meal.price,
-  establishmentName: meal.establishmentName,
-  mealTime: meal.mealTime,
-  healthScore: meal.healthScore,
-  isFried: meal.isFried,
-  isSoup: meal.isSoup,
-  isVegetarian: meal.isVegetarian,
-  tags: meal.tags,
-  allergens: meal.allergens,
-  mealQuality: meal.mealQuality,
-  isStandalone: meal.isStandalone,
-})),
+        _id: meal._id,
+        mealName: meal.mealName,
+        foodType: String(meal.foodType ?? "").toLowerCase(),
+        category: meal.category,
+        price: meal.price,
+        establishmentName: meal.establishmentName,
+        mealTime: meal.mealTime,
+        healthScore: meal.healthScore,
+        isFried: meal.isFried,
+        isSoup: meal.isSoup,
+        isVegetarian: meal.isVegetarian,
+        tags: meal.tags,
+        allergens: meal.allergens,
+        mealQuality: meal.mealQuality,
+        isStandalone: meal.isStandalone,
+      })),
       mealsPerDay,
       count,
       preferenceMode,
@@ -456,6 +536,18 @@ export async function POST(req: NextRequest) {
 
       const options = Array.isArray(solverData.options) ? solverData.options : [];
 
+      console.log("[generate] raw solver options:");
+
+options.forEach((option: any, i: number) => {
+  console.log(
+    `[generate] option ${i + 1}:`,
+    option.meals.map(
+      (m: any) =>
+        `${m.mealName} (${m.establishmentName}) ₱${m.price}`
+    )
+  );
+});
+
       if (!options.length) {
         return NextResponse.json(
           {
@@ -479,6 +571,15 @@ export async function POST(req: NextRequest) {
         return true;
       });
 
+      console.log(
+          "[generate] unique option sets:",
+          uniqueOptions.map((opt: any) =>
+            opt.meals.map((m: any) => m.mealName)
+          )
+        );
+
+      
+
       if (!uniqueOptions.length) {
         return NextResponse.json(
           {
@@ -489,12 +590,24 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const diversifiedOptions = diversifyOptions(uniqueOptions, count);
+      console.log(
+        "[generate] diversified final options:",
+        diversifiedOptions.map((opt: any) =>
+          opt.meals.map((m: any) => m.mealName)
+        )
+      );
+
+      console.log(`[generate] unique daily options: ${uniqueOptions.length}`);
+      console.log(
+        `[generate] diversified daily options returned: ${diversifiedOptions.length}`
+      );
       console.log(`[generate] TOTAL: ${Date.now() - totalStart}ms`);
 
       return NextResponse.json({
         ok: true,
         allowanceType: "daily",
-        options: uniqueOptions,
+        options: diversifiedOptions,
       });
     }
 
