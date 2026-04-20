@@ -53,7 +53,7 @@ export function EstablishmentsSection({
         whileInView="show"
         viewport={{ once: true, amount: 0.2 }}
       >
-        <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-xs font-medium text-[#025a5a] backdrop-blur-xl shadow-[0_8px_24px_rgba(2,48,48,0.12)]">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#ffdca8]/70 bg-[linear-gradient(135deg,rgba(255,248,230,0.95),rgba(255,244,214,0.85),rgba(227,242,253,0.70))] px-3 py-1.5 text-xs font-medium text-[#7a4b00] shadow-[0_6px_18px_rgba(122,75,0,0.10)]">
           <Store className="h-3.5 w-3.5" />
           Food spots near you
         </div>

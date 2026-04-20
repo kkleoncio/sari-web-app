@@ -196,6 +196,17 @@ export default function HomePage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const numericBudget = React.useMemo(() => Number(budget || 0), [budget]);
 
+  const [openTreatModal, setOpenTreatModal] = React.useState(false);
+  const [treatMode, setTreatMode] = React.useState<"budget" | "unlimited">(
+    "budget",
+  );
+  const [treatBudget, setTreatBudget] = React.useState("");
+  const [treatRolling, setTreatRolling] = React.useState(false);
+  const [treatResult, setTreatResult] = React.useState<Meal | null>(null);
+  const [roulettePreview, setRoulettePreview] = React.useState<Meal | null>(
+    null,
+  );
+
   React.useEffect(() => {
     router.prefetch("/home/weekly-plan");
     router.prefetch("/home/meals");
@@ -286,7 +297,6 @@ export default function HomePage() {
   const mainRef = React.useRef<HTMLElement | null>(null);
   const navDebounceRef = React.useRef<NodeJS.Timeout | null>(null);
 
-
   const [preferenceMode, setPreferenceMode] =
     React.useState<PreferenceMode>("balanced");
   const [mealType, setMealType] = React.useState<MealType>("full-meals");
@@ -361,7 +371,6 @@ export default function HomePage() {
             bestKey = key;
           }
         }
-
 
         // then replace setActiveNav(bestKey) with:
         if (navDebounceRef.current) clearTimeout(navDebounceRef.current);
@@ -913,6 +922,62 @@ export default function HomePage() {
     }
   };
 
+  const handleSpinTreatRoulette = React.useCallback(() => {
+    const parsedBudget = Number(treatBudget || 0);
+
+    let candidates = meals.filter((meal) => {
+      const price = Number(meal.price || 0);
+      const quality = String((meal as any).mealQuality || "").toLowerCase();
+      const category = String(meal.category || "").toLowerCase();
+
+      if (price <= 0) return false;
+      if (quality === "side" || quality === "drink") return false;
+      if (category === "drink") return false;
+
+      if (treatMode === "budget") {
+        return price <= parsedBudget;
+      }
+
+      return true;
+    });
+
+    if (treatMode === "budget" && (!parsedBudget || parsedBudget <= 0)) {
+      toast.error("Enter a valid treat budget first.");
+      return;
+    }
+
+    if (!candidates.length) {
+      toast.error("No yummy meals match that treat setting.");
+      setTreatResult(null);
+      setRoulettePreview(null);
+      return;
+    }
+
+    candidates = [...candidates].sort(() => Math.random() - 0.5);
+
+    setTreatRolling(true);
+    setTreatResult(null);
+
+    let tick = 0;
+    const maxTicks = 14;
+
+    const interval = setInterval(() => {
+      const randomMeal =
+        candidates[Math.floor(Math.random() * candidates.length)];
+      setRoulettePreview(randomMeal);
+      tick += 1;
+
+      if (tick >= maxTicks) {
+        clearInterval(interval);
+        const winner =
+          candidates[Math.floor(Math.random() * candidates.length)];
+        setRoulettePreview(winner);
+        setTreatResult(winner);
+        setTreatRolling(false);
+      }
+    }, 120);
+  }, [meals, treatBudget, treatMode]);
+
   const handleRemoveMeal = async (index: number) => {
     const updatedMeals = mealPlan.filter((_, i) => i !== index);
 
@@ -1222,6 +1287,24 @@ export default function HomePage() {
                         <Wallet className="mr-2 h-4 w-4" />
                         Adjust budget
                       </Button>
+
+                      <Button
+                        variant="outline"
+                        className="group font-poppins relative overflow-hidden rounded-xl border border-[#ffdca8]/70 bg-[linear-gradient(135deg,rgba(255,248,230,0.92),rgba(255,244,214,0.82),rgba(227,242,253,0.70))] px-5 text-[#7a4b00] shadow-[0_12px_24px_rgba(122,75,0,0.10)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_28px_rgba(122,75,0,0.14)] hover:bg-[linear-gradient(135deg,rgba(255,248,230,1),rgba(255,239,194,0.95),rgba(227,242,253,0.82))]"
+                        onClick={() => {
+                          setOpenTreatModal(true);
+                          setTreatResult(null);
+                          setRoulettePreview(null);
+                          setTreatRolling(false);
+                        }}
+                      >
+                        <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.55),transparent_45%)]" />
+                        <span className="relative z-10 flex items-center">
+                          <span className="mr-2 text-base">🍜</span>
+                          {/* <Sparkles className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:rotate-12" /> */}
+                          Treat Yourself
+                        </span>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -1241,7 +1324,7 @@ export default function HomePage() {
                     </div>
 
                     <div className="rounded-[24px] border border-white/40 bg-[linear-gradient(135deg,#022b2b_0%,#033f3f_45%,#046d6d_90%,#0a8f8f_100%)] p-6 backdrop-blur-md shadow-[0_10px_24px_rgba(2,48,48,0.08)]">
-                      <div className="mb-3 inline-flex rounded-xl bg-[#E3F2FD] p-2 text-[#023030]">
+                      <div className="mb-3 inline-flex rounded-xl border border-[#b7e4c7]/70 bg-[linear-gradient(135deg,rgba(232,250,239,0.95),rgba(212,245,225,0.90),rgba(227,242,253,0.70))] p-2 text-[#1b5e20] shadow-[0_6px_16px_rgba(27,94,32,0.08)]">
                         <UtensilsCrossed className="h-4 w-4" />
                       </div>
                       <p className="font-helvetica text-xs font-light text-white">
@@ -1253,7 +1336,8 @@ export default function HomePage() {
                     </div>
 
                     <div className="rounded-[24px] border border-white/40 bg-[linear-gradient(135deg,#022b2b_0%,#033f3f_45%,#046d6d_90%,#0a8f8f_100%)] p-6 backdrop-blur-md shadow-[0_10px_24px_rgba(2,48,48,0.08)]">
-                      <div className="mb-3 inline-flex rounded-xl bg-[#E3F2FD] p-2 text-[#023030]">
+                      <div className="mb-3 inline-flex rounded-xl border border-[#ffdca8]/70 bg-[linear-gradient(135deg,rgba(255,248,230,0.98),rgba(255,244,214,0.90),rgba(227,242,253,0.70))] p-2 text-[#7a4b00] shadow-[0_6px_16px_rgba(122,75,0,0.10)]">
+                        {" "}
                         <Sparkles className="h-4 w-4" />
                       </div>
                       <p className="font-helvetica text-xs font-light text-white">
@@ -1413,7 +1497,7 @@ export default function HomePage() {
               <div className="rounded-[30px] border border-white/40 bg-white/50 p-5 shadow-[0_10px_30px_rgba(2,48,48,0.08)] backdrop-blur-md md:p-6">
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-xs font-medium text-[#025a5a] backdrop-blur-md shadow-[0_8px_24px_rgba(2,48,48,0.12)]">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#ffdca8]/70 bg-[linear-gradient(135deg,rgba(255,248,230,0.95),rgba(255,244,214,0.85),rgba(227,242,253,0.70))] px-3 py-1.5 text-xs font-medium text-[#7a4b00] shadow-[0_6px_18px_rgba(122,75,0,0.10)]">
                       <Sparkles className="h-3.5 w-3.5" />
                       Personalized picks
                     </div>
@@ -1874,6 +1958,190 @@ export default function HomePage() {
             onOpenChange={handleOpenChangeReplaceGeneratedPlan}
             onConfirm={handleConfirmReplaceGeneratedPlan}
           />
+
+          {openTreatModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,48,48,0.34)] px-4 backdrop-blur-sm">
+              <div className="w-full max-w-lg h-[620px] overflow-hidden rounded-[32px] border border-white/40 bg-white backdrop-blur-2xl">
+                <div className="relative flex h-full flex-col p-6 md:p-7">
+                  <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#ffe9b8]/55 blur-3xl" />
+                  <div className="pointer-events-none absolute bottom-0 left-0 h-24 w-24 rounded-full bg-[#ccffe8]/35 blur-3xl" />
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.55),transparent_72%)]" />
+
+                  <div className="flex-1">
+                    <div className="relative z-10 flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-poppins mt-3 text-[24px] font-semibold tracking-tight text-[#023030]">
+                          Treat Yourself Tonight
+                        </p>
+
+                        <p className="font-helvetica mt-2 max-w-md text-sm leading-6 text-[#023030]/68">
+                          Spin for a random yummy reward after a long day.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setOpenTreatModal(false)}
+                        className="rounded-full border border-white/55 bg-white/75 px-3 py-1.5 text-sm text-[#023030]/70 shadow-sm transition hover:bg-white hover:text-[#023030]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="mt-6 grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setTreatMode("budget")}
+                        className={`group flex flex-col items-center justify-center rounded-[22px] border px-4 py-5 text-center transition-all duration-200 ${
+                          treatMode === "budget"
+                            ? "border-[#7a4b00]/30 bg-[linear-gradient(135deg,rgba(255,244,214,0.98),rgba(255,232,178,0.94),rgba(255,248,230,0.90))] text-[#7a4b00] shadow-[0_14px_28px_rgba(122,75,0,0.14)]"
+                            : "border-white/50 bg-white/72 text-[#023030] shadow-[0_8px_18px_rgba(2,48,48,0.06)] hover:-translate-y-0.5 hover:bg-white/90"
+                        }`}
+                      >
+                        <div className="mb-2 text-5xl leading-none transition-transform duration-200 group-hover:scale-110">
+                          ₱
+                        </div>
+
+                        <div
+                          className={`font-poppins text-sm font-semibold ${
+                            treatMode === "budget"
+                              ? "text-[#7a4b00]"
+                              : "text-[#023030]"
+                          }`}
+                        >
+                          Set a budget
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => setTreatMode("unlimited")}
+                        className={`group flex flex-col items-center justify-center rounded-[22px] border px-4 py-5 text-center transition-all duration-200 ${
+                          treatMode === "unlimited"
+                            ? "border-[#7a4b00]/30 bg-[linear-gradient(135deg,rgba(255,244,214,0.98),rgba(255,232,178,0.94),rgba(255,248,230,0.90))] text-[#7a4b00] shadow-[0_14px_28px_rgba(122,75,0,0.14)]"
+                            : "border-white/50 bg-white/72 text-[#023030] shadow-[0_8px_18px_rgba(2,48,48,0.06)] hover:-translate-y-0.5 hover:bg-white/90"
+                        }`}
+                      >
+                        <div className="mb-2 text-5xl leading-none transition-transform duration-200 group-hover:scale-110">
+                          🌟
+                        </div>
+
+                        <div
+                          className={`font-poppins text-sm font-semibold ${
+                            treatMode === "unlimited"
+                              ? "text-[#7a4b00]"
+                              : "text-[#023030]"
+                          }`}
+                        >
+                          Sky&apos;s the limit
+                        </div>
+                      </button>
+                    </div>
+
+                    <div className="mt-4 min-h-[44px] flex items-center justify-between">
+                      {treatMode === "budget" ? (
+                        <>
+                          <label className="font-poppins text-xs font-medium uppercase tracking-[0.16em] text-[#023030]/55">
+                            Treat budget
+                          </label>
+
+                          <div className="flex w-[140px] items-center rounded-[18px] text-[linear-gradient(135deg,#023030_0%,#034646_45%,#046d6d_85%,#0aa3a3_100%)] border border-white/50 bg-white/85 px-3 py-2 shadow-[0_6px_16px_rgba(2,48,48,0.05)]">
+                            <span className="mr-1 text-sm font-semibold text-[#7a4b00]">
+                              ₱
+                            </span>
+
+                            <input
+                              value={treatBudget}
+                              onChange={(e) => setTreatBudget(e.target.value)}
+                              placeholder="80"
+                              className="font-helvetica w-full bg-transparent text-sm text-[#023030] outline-none placeholder:text-[#023030]/35 text-right"
+                            />
+
+                            <span className="ml-1 text-base">🍽️</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex w-full items-center justify-center gap-2 text-sm text-[#023030]/55">
+                          <span className="text-lg">✨</span>
+                          <span className="font-helvetica">
+                            No budget limit, enjoy the surprise!
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-0">
+                      <div className="mt-3 min-h-[200px] flex flex-col justify-center rounded-[28px] border border-white/45 bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(255,244,214,0.70),rgba(227,242,253,0.52))] px-5 py-6 text-center shadow-[0_14px_30px_rgba(122,75,0,0.08)]">
+                        {" "}
+                        {roulettePreview ? (
+                          <>
+                            <div
+                              className={`mb-3 text-4xl ${treatRolling ? "animate-pulse" : ""}`}
+                            >
+                              {treatRolling ? "🎰" : "🍛"}
+                            </div>
+
+                            <p className="font-poppins text-xl font-semibold leading-tight text-[#023030]">
+                              {roulettePreview.mealName}
+                            </p>
+
+                            <p className="font-helvetica mt-2 text-sm text-[#023030]/65">
+                              {roulettePreview.establishmentName}
+                            </p>
+
+                            <div className="mt-4 flex justify-center">
+                              <div className="inline-flex items-center gap-2 rounded-full bg-[#fff4d6] px-4 py-2 text-sm font-semibold text-[#7a4b00] shadow-sm">
+                                <span>💸</span>
+                                {formatPeso(Number(roulettePreview.price || 0))}
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="py-4">
+                            <div className="mb-3 text-4xl">🍽️</div>
+                            <p className="font-poppins text-base font-semibold text-[#023030]">
+                              Ready for a surprise?
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 border-t border-white/45 pt-4">
+                    <div
+                      className={`flex gap-2 ${
+                        treatResult ? "flex-col sm:flex-row" : "justify-center"
+                      }`}
+                    >
+                      <Button
+                        onClick={handleSpinTreatRoulette}
+                        disabled={treatRolling}
+                        className={`font-poppins rounded-xl bg-[linear-gradient(135deg,#023030_0%,#034646_45%,#046d6d_85%,#0aa3a3_100%)] text-white shadow-[0_14px_30px_rgba(4,109,109,0.25)] hover:shadow-[0_18px_36px_rgba(4,109,109,0.35)] hover:-translate-y-[1px] active:translate-y-[0px] transition-all duration-200 ${
+                          treatResult ? "flex-1" : "w-[220px] mx-auto"
+                        }`}
+                      >
+                        <span
+                          className={`mr-2 text-base ${treatRolling ? "animate-spin" : ""}`}
+                        >
+                          {treatRolling ? "🎰" : "✨"}
+                        </span>
+                        {treatRolling ? "Spinning..." : "Spin the roulette"}
+                      </Button>
+
+                      {treatResult && (
+                        <Button
+                          variant="outline"
+                          onClick={() => handleManualAdd(treatResult)}
+                          className="font-poppins rounded-xl border-[#ffdca8]/70 bg-[linear-gradient(135deg,rgba(255,248,230,0.98),rgba(255,244,214,0.90),rgba(227,242,253,0.76))] text-[#7a4b00] shadow-[0_10px_20px_rgba(122,75,0,0.10)] hover:bg-[linear-gradient(135deg,rgba(255,248,230,1),rgba(255,239,194,0.96),rgba(227,242,253,0.84))]"
+                        >
+                          <span className="mr-2">🍴</span>
+                          Add to my meals
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>
